@@ -12,10 +12,10 @@
 
 // 悬浮窗总高度
 #define kFloatHeight   60.0
-#define kFloatWidth    60.0
+#define kFloatWidth    40.0
 
 // 默认值
-#define kDefaultTimeout   120
+#define kDefaultTimeout   90
 #define kDefaultCooldown  2
 
 static UIView *floatView = nil;
@@ -45,7 +45,7 @@ static UIView *floatView = nil;
         [self addGestureRecognizer:tapBg];
 
         CGFloat panelW = 290;
-        CGFloat panelH = 300;
+        CGFloat panelH = 350;
         _panelContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, panelW, panelH)];
         _panelContainer.center = self.center;
         _panelContainer.backgroundColor = [UIColor whiteColor];
@@ -233,7 +233,7 @@ static UIView *floatView = nil;
         // 内容（蓝色）
         _contentLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 22, kFloatWidth-8, 16)];
         _contentLabel.textAlignment = NSTextAlignmentCenter;
-        _contentLabel.font = [UIFont systemFontOfSize:12];
+        _contentLabel.font = [UIFont systemFontOfSize:13];
         _contentLabel.textColor = [UIColor blueColor];
         _contentLabel.adjustsFontSizeToFitWidth = YES;
         _contentLabel.minimumScaleFactor = 0.5;
@@ -242,7 +242,7 @@ static UIView *floatView = nil;
         // 计时小字（深灰色）
         _timerLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 40, kFloatWidth-8, 14)];
         _timerLabel.textAlignment = NSTextAlignmentCenter;
-        _timerLabel.font = [UIFont systemFontOfSize:8];
+        _timerLabel.font = [UIFont systemFontOfSize:6];
         _timerLabel.textColor = [UIColor darkGrayColor];
         _timerLabel.text = @"0";
         [self addSubview:_timerLabel];
