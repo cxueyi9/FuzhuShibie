@@ -11,8 +11,8 @@
 #define kCooldownKey   @"FloatInject_cooldown"   // 冷却时间（秒）
 
 // 悬浮窗总高度
-#define kFloatHeight   60.0
-#define kFloatWidth    40.0
+#define kFloatHeight   55.0
+#define kFloatWidth    38.0
 
 // 默认值
 #define kDefaultTimeout   90
@@ -74,7 +74,7 @@ static UIView *floatView = nil;
         _itemsField.borderStyle = UITextBorderStyleRoundedRect;
         _itemsField.font = [UIFont systemFontOfSize:13];
         _itemsField.text = items ?: @"";
-        _itemsField.placeholder = @"标题1,内容1;标题2,内容2";
+        _itemsField.placeholder = @"🔔,登录;♦️,首页;🌴,装货;🟢,退出";
         _itemsField.delegate = self;
         [_panelContainer addSubview:_itemsField];
         y += 42;
@@ -224,7 +224,7 @@ static UIView *floatView = nil;
         // 标题（红色）
         _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 6, kFloatWidth-8, 16)];
         _titleLabel.textAlignment = NSTextAlignmentCenter;
-        _titleLabel.font = [UIFont boldSystemFontOfSize:13];
+        _titleLabel.font = [UIFont boldSystemFontOfSize:14];
         _titleLabel.textColor = [UIColor redColor];
         _titleLabel.adjustsFontSizeToFitWidth = YES;
         _titleLabel.minimumScaleFactor = 0.5;
@@ -445,6 +445,7 @@ static UIView *floatView = nil;
     if (self.elapsedSeconds >= self.timeout && !self.alertPlayed) {
         self.alertPlayed = YES;
         // 播放短信提示音 (1007)
+        AudioServicesPlaySystemSound(1007);
         AudioServicesPlaySystemSound(1007);
     }
 }
