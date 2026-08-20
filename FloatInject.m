@@ -17,8 +17,8 @@
 #define kCountdownStartKey  @"FloatInject_countdown_start"  // 倒计时起始时间戳
 
 // 悬浮窗尺寸
-#define kFloatWidth    42.0
-#define kFloatHeight   55.0
+#define kFloatWidth    38.0
+#define kFloatHeight   50.0
 
 // 默认值
 #define kDefaultTimeout      120
@@ -61,7 +61,7 @@ static UIView *floatView = nil;
         [self addGestureRecognizer:tapBg];
 
         CGFloat panelW = 290;
-        CGFloat panelH = 460;
+        CGFloat panelH = 530;  // 修改为 530
         _panelContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, panelW, panelH)];
         _panelContainer.center = self.center;
         _panelContainer.backgroundColor = [UIColor whiteColor];
@@ -300,7 +300,8 @@ static UIView *floatView = nil;
         self.layer.shadowOpacity = 0.3;
         self.layer.shadowRadius = 4;
 
-        _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 6, kFloatWidth-8, 16)];
+        // 适配新尺寸（38x50）
+        _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 4, kFloatWidth-8, 14)];
         _titleLabel.textAlignment = NSTextAlignmentCenter;
         _titleLabel.font = [UIFont boldSystemFontOfSize:14];
         _titleLabel.textColor = [UIColor redColor];
@@ -308,7 +309,7 @@ static UIView *floatView = nil;
         _titleLabel.minimumScaleFactor = 0.5;
         [self addSubview:_titleLabel];
 
-        _contentLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 22, kFloatWidth-8, 16)];
+        _contentLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 18, kFloatWidth-8, 14)];
         _contentLabel.textAlignment = NSTextAlignmentCenter;
         _contentLabel.font = [UIFont systemFontOfSize:12];
         _contentLabel.textColor = [UIColor blueColor];
@@ -316,7 +317,7 @@ static UIView *floatView = nil;
         _contentLabel.minimumScaleFactor = 0.5;
         [self addSubview:_contentLabel];
 
-        _timerLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 38, kFloatWidth-8, 14)];
+        _timerLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 34, kFloatWidth-8, 10)];
         _timerLabel.textAlignment = NSTextAlignmentCenter;
         _timerLabel.font = [UIFont systemFontOfSize:7];
         _timerLabel.textColor = [UIColor darkGrayColor];
@@ -394,30 +395,27 @@ static UIView *floatView = nil;
 
     // 计时器状态恢复
     if (self.paused) {
-        // 读取起始时间戳
         NSTimeInterval startTime = [def doubleForKey:kCountdownStartKey];
+        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         if (startTime <= 0) {
-            // 如果没有起始时间（理论上暂停模式下一定有），则现在开始
-            startTime = [[NSDate date] timeIntervalSince1970];
+            startTime = now;
             [def setDouble:startTime forKey:kCountdownStartKey];
         }
-        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
-        NSTimeInterval elapsed = now - startTime;
-        NSTimeInterval totalSeconds = self.countdownMin * 60.0;
-        NSTimeInterval remaining = totalSeconds - elapsed;
-        self.countdownSeconds = (NSInteger)remaining; // 可为负
+        NSInteger elapsed = (NSInteger)(now - startTime);
+        NSInteger totalSeconds = self.countdownMin * 60;
+        NSInteger remaining = totalSeconds - elapsed;
+        self.countdownSeconds = remaining;
         [self updateTimerLabel];
 
-        // 如果剩余<=0且开关打开，立即关闭App
-        if (remaining <= 0 && self.closeAppOnEnd) {
+        // 仅在 remaining == 0 且开关打开时关闭
+        if (remaining == 0 && self.closeAppOnEnd) {
             [self stopTimer];
             exit(0);
         }
-
+        // remaining < 0 或 > 0 均不关闭，继续倒计时
         [self startTimer];
         [self updateIdleTimerDisabled];
     } else {
-        // 正常模式
         [self stopTimer];
         self.elapsedSeconds = 0;
         self.alertPlayed = NO;
@@ -444,14 +442,14 @@ static UIView *floatView = nil;
 
 - (void)updateTimerLabel {
     NSInteger totalSeconds = self.paused ? self.countdownSeconds : self.elapsedSeconds;
-    NSInteger minutes = totalSeconds / 60;
-    NSInteger seconds = totalSeconds % 60;
-    // 负数处理：分钟和秒都可能为负，使用绝对值显示负号在分钟前
     if (totalSeconds < 0) {
-        minutes = - (labs(totalSeconds) / 60);
-        seconds = labs(totalSeconds) % 60;
-        self.timerLabel.text = [NSString stringWithFormat:@"-%02ld:%02ld", (long)labs(minutes), (long)seconds];
+        NSInteger absTotal = labs(totalSeconds);
+        NSInteger minutes = absTotal / 60;
+        NSInteger seconds = absTotal % 60;
+        self.timerLabel.text = [NSString stringWithFormat:@"-%02ld:%02ld", (long)minutes, (long)seconds];
     } else {
+        NSInteger minutes = totalSeconds / 60;
+        NSInteger seconds = totalSeconds % 60;
         self.timerLabel.text = [NSString stringWithFormat:@"%02ld:%02ld", (long)minutes, (long)seconds];
     }
 }
@@ -486,12 +484,10 @@ static UIView *floatView = nil;
     [self updateLabels];
 
     if (self.paused) {
-        // 进入暂停模式：记录起始时间戳
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         [[NSUserDefaults standardUserDefaults] setDouble:now forKey:kCountdownStartKey];
         [self resetCountdown];
     } else {
-        // 退出暂停模式：清除起始时间戳，重置正常计时
         [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCountdownStartKey];
         [self resetTimer];
     }
@@ -619,7 +615,6 @@ static UIView *floatView = nil;
 
 - (void)resetCountdown {
     [self stopTimer];
-    // 总时长由起始时间戳和当前时间计算，不直接设置 countdownSeconds
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
     NSTimeInterval startTime = [[NSUserDefaults standardUserDefaults] doubleForKey:kCountdownStartKey];
     NSTimeInterval elapsed = now - startTime;
@@ -648,17 +643,16 @@ static UIView *floatView = nil;
 
 - (void)timerTick {
     if (self.paused) {
-        // 倒计时递减
         self.countdownSeconds--;
         [self updateTimerLabel];
 
-        if (self.countdownSeconds <= 0 && self.closeAppOnEnd) {
+        // 仅在倒计时恰好变为 0 时关闭
+        if (self.countdownSeconds == 0 && self.closeAppOnEnd) {
             [self stopTimer];
             exit(0);
         }
-        // 如果 closeAppOnEnd 为 NO，继续倒计时（可为负）
+        // 小于 0 不关闭，继续倒计时
     } else {
-        // 正常模式正计时
         self.elapsedSeconds++;
         [self updateTimerLabel];
 
