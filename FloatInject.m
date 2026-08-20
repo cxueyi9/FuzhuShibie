@@ -1,20 +1,25 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioServices.h>
 
+// ===== 新增：导入触摸模拟所需头文件 =====
+#import "UITouch-KIFAdditions.h"
+#import "UIEvent+KIFAdditions.h"
+#import "UIApplication-KIFAdditions.h"
+
 // 存储键
 #define kItemsKey           @"FloatInject_items"
 #define kLockedKey          @"FloatInject_locked"
 #define kIndexKey           @"FloatInject_index"
 #define kPosXKey            @"FloatInject_x"
 #define kPosYKey            @"FloatInject_y"
-#define kTimeoutKey         @"FloatInject_timeout"          // 正常模式超时提醒（秒）
-#define kCooldownKey        @"FloatInject_cooldown"         // 冷却时间（秒）
-#define kPausedKey          @"FloatInject_paused"           // 暂停模式
-#define kBarkEnabledKey     @"FloatInject_bark_enabled"     // Bark 推送开关
-#define kBarkKeyKey         @"FloatInject_bark_key"         // Bark 密钥
-#define kCountdownKey       @"FloatInject_countdown_min"    // 暂停模式倒计时分钟数
-#define kCloseAppKey        @"FloatInject_close_app"        // 倒计时结束是否关闭App
-#define kCountdownStartKey  @"FloatInject_countdown_start"  // 倒计时起始时间戳
+#define kTimeoutKey         @"FloatInject_timeout"
+#define kCooldownKey        @"FloatInject_cooldown"
+#define kPausedKey          @"FloatInject_paused"
+#define kBarkEnabledKey     @"FloatInject_bark_enabled"
+#define kBarkKeyKey         @"FloatInject_bark_key"
+#define kCountdownKey       @"FloatInject_countdown_min"
+#define kCloseAppKey        @"FloatInject_close_app"
+#define kCountdownStartKey  @"FloatInject_countdown_start"
 
 // 悬浮窗尺寸
 #define kFloatWidth    38.0
@@ -477,6 +482,42 @@ static UIView *floatView = nil;
     [self sendBarkNotificationIfEnabled];
 }
 
+// ===== 新增：模拟触摸方法 =====
+- (void)sendTapAtPoint:(CGPoint)screenPoint inWindow:(UIWindow *)window withDuration:(NSTimeInterval)duration {
+    if (!window) {
+        NSLog(@"[FloatInject] ❌ Window is nil");
+        return;
+    }
+    CGPoint windowPoint = [window convertPoint:screenPoint fromWindow:nil];
+    NSLog(@"[FloatInject] 📱 Sending touch at screen(%.0f,%.0f) -> window(%.0f,%.0f) duration %.2f", screenPoint.x, screenPoint.y, windowPoint.x, windowPoint.y, duration);
+    
+    @try {
+        UITouch *touch = [[UITouch alloc] initAtPoint:windowPoint inWindow:window];
+        if (!touch) { return; }
+        [touch setPhaseAndUpdateTimestamp:UITouchPhaseBegan];
+        [touch setTapCount:1];
+        
+        UIEvent *event = [[UIApplication sharedApplication] _touchesEvent];
+        [event _clearTouches];
+        [event kif_setEventWithTouches:@[touch]];
+        [event _addTouch:touch forDelayedDelivery:NO];
+        [[UIApplication sharedApplication] sendEvent:event];
+        
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(duration * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [touch setPhaseAndUpdateTimestamp:UITouchPhaseEnded];
+            [event _clearTouches];
+            [event kif_setEventWithTouches:@[touch]];
+            [event _addTouch:touch forDelayedDelivery:NO];
+            [[UIApplication sharedApplication] sendEvent:event];
+            NSLog(@"[FloatInject] ✅ Touch ended");
+        });
+    } @catch (NSException *e) {
+        NSLog(@"[FloatInject] ❌ Exception: %@", e);
+    }
+}
+
+
+// ===== 修改：双击暂停时发送点击 =====
 - (void)handleDoubleTap:(UITapGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateEnded) return;
     self.paused = !self.paused;
@@ -484,9 +525,29 @@ static UIView *floatView = nil;
     [self updateLabels];
 
     if (self.paused) {
+        // 进入暂停模式：重置倒计时并开始计时
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         [[NSUserDefaults standardUserDefaults] setDouble:now forKey:kCountdownStartKey];
         [self resetCountdown];
+        
+        // ===== 新增：发送一次点击到 (390,390) =====
+        UIWindow *targetWindow = nil;
+        // 优先查找 windowLevel == 1999 的窗口（老贝贝所在窗口）
+        for (UIWindow *w in [UIApplication sharedApplication].windows) {
+            if (w.windowLevel == 1999.0) {
+                targetWindow = w;
+                break;
+            }
+        }
+        if (!targetWindow) {
+            // 如果没有找到，使用 keyWindow
+            targetWindow = [UIApplication sharedApplication].keyWindow;
+        }
+        if (targetWindow) {
+            [self sendTapAtPoint:CGPointMake(390, 390) inWindow:targetWindow withDuration:0.2];
+        } else {
+            NSLog(@"[FloatInject] ⚠️ No window found for tap");
+        }
     } else {
         [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCountdownStartKey];
         [self resetTimer];
