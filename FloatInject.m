@@ -9,13 +9,14 @@
 #define kPosYKey       @"FloatInject_y"
 #define kTimeoutKey    @"FloatInject_timeout"    // 超时提醒（秒）
 #define kCooldownKey   @"FloatInject_cooldown"   // 冷却时间（秒）
+#define kPausedKey     @"FloatInject_paused"     // 暂停模式
 
 // 悬浮窗总高度
-#define kFloatHeight   55.0
-#define kFloatWidth    38.0
+#define kFloatHeight   60.0
+#define kFloatWidth    60.0
 
 // 默认值
-#define kDefaultTimeout   90
+#define kDefaultTimeout   120
 #define kDefaultCooldown  2
 
 static UIView *floatView = nil;
@@ -45,7 +46,7 @@ static UIView *floatView = nil;
         [self addGestureRecognizer:tapBg];
 
         CGFloat panelW = 290;
-        CGFloat panelH = 350;
+        CGFloat panelH = 300;
         _panelContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, panelW, panelH)];
         _panelContainer.center = self.center;
         _panelContainer.backgroundColor = [UIColor whiteColor];
@@ -74,7 +75,7 @@ static UIView *floatView = nil;
         _itemsField.borderStyle = UITextBorderStyleRoundedRect;
         _itemsField.font = [UIFont systemFontOfSize:13];
         _itemsField.text = items ?: @"";
-        _itemsField.placeholder = @"🔔,登录;♦️,首页;🌴,装货;🟢,退出";
+        _itemsField.placeholder = @"标题1,内容1;标题2,内容2";
         _itemsField.delegate = self;
         [_panelContainer addSubview:_itemsField];
         y += 42;
@@ -196,18 +197,18 @@ static UIView *floatView = nil;
 @interface FloatView : UIView
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *contentLabel;
-@property (nonatomic, strong) UILabel *timerLabel;        // 计时小字
+@property (nonatomic, strong) UILabel *timerLabel;
 @property (nonatomic, assign) NSInteger currentIndex;
 @property (nonatomic, strong) NSArray<NSDictionary *> *items;
 @property (nonatomic, assign) BOOL locked;
-@property (nonatomic, assign) NSInteger timeout;          // 超时提醒秒数
-@property (nonatomic, assign) NSInteger cooldown;         // 冷却秒数
+@property (nonatomic, assign) NSInteger timeout;
+@property (nonatomic, assign) NSInteger cooldown;
+@property (nonatomic, assign) BOOL paused;                     // 暂停模式
 
-// 计时相关
 @property (nonatomic, strong) NSTimer *timer;
 @property (nonatomic, assign) NSInteger elapsedSeconds;
 @property (nonatomic, assign) BOOL alertPlayed;
-@property (nonatomic, assign) NSTimeInterval lastTapTime; // 上次有效点击时间戳
+@property (nonatomic, assign) NSTimeInterval lastTapTime;
 @end
 
 @implementation FloatView
@@ -224,7 +225,7 @@ static UIView *floatView = nil;
         // 标题（红色）
         _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 6, kFloatWidth-8, 16)];
         _titleLabel.textAlignment = NSTextAlignmentCenter;
-        _titleLabel.font = [UIFont boldSystemFontOfSize:14];
+        _titleLabel.font = [UIFont boldSystemFontOfSize:13];
         _titleLabel.textColor = [UIColor redColor];
         _titleLabel.adjustsFontSizeToFitWidth = YES;
         _titleLabel.minimumScaleFactor = 0.5;
@@ -233,7 +234,7 @@ static UIView *floatView = nil;
         // 内容（蓝色）
         _contentLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 22, kFloatWidth-8, 16)];
         _contentLabel.textAlignment = NSTextAlignmentCenter;
-        _contentLabel.font = [UIFont systemFontOfSize:13];
+        _contentLabel.font = [UIFont systemFontOfSize:12];
         _contentLabel.textColor = [UIColor blueColor];
         _contentLabel.adjustsFontSizeToFitWidth = YES;
         _contentLabel.minimumScaleFactor = 0.5;
@@ -242,14 +243,22 @@ static UIView *floatView = nil;
         // 计时小字（深灰色）
         _timerLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 40, kFloatWidth-8, 14)];
         _timerLabel.textAlignment = NSTextAlignmentCenter;
-        _timerLabel.font = [UIFont systemFontOfSize:6];
+        _timerLabel.font = [UIFont systemFontOfSize:8];
         _timerLabel.textColor = [UIColor darkGrayColor];
-        _timerLabel.text = @"0";
+        _timerLabel.text = @"00:00:00";
         [self addSubview:_timerLabel];
 
-        // 手势
+        // 单击手势
         UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
         [self addGestureRecognizer:tap];
+
+        // 双击手势
+        UITapGestureRecognizer *doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTap:)];
+        doubleTap.numberOfTapsRequired = 2;
+        [self addGestureRecognizer:doubleTap];
+
+        // 让单击手势在双击手势失败后才触发，避免冲突
+        [tap requireGestureRecognizerToFail:doubleTap];
 
         UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
         [self addGestureRecognizer:pan];
@@ -270,15 +279,14 @@ static UIView *floatView = nil;
     if (self.timeout <= 0) self.timeout = kDefaultTimeout;
     self.cooldown = [def integerForKey:kCooldownKey];
     if (self.cooldown <= 0) self.cooldown = kDefaultCooldown;
+    self.paused = [def boolForKey:kPausedKey];
 
-    // 拖拽手势受锁定影响
     for (UIGestureRecognizer *gr in self.gestureRecognizers) {
         if ([gr isKindOfClass:[UIPanGestureRecognizer class]]) {
             gr.enabled = !self.locked;
         }
     }
 
-    // 文字内容解析
     NSString *itemsString = [def objectForKey:kItemsKey];
     if (!itemsString || itemsString.length == 0) {
         itemsString = @"示例,内容;第二条,信息";
@@ -300,7 +308,6 @@ static UIView *floatView = nil;
         self.currentIndex = 0;
     }
 
-    // 位置恢复
     CGFloat x = [def doubleForKey:kPosXKey];
     CGFloat y = [def doubleForKey:kPosYKey];
     if (x == 0 && y == 0) {
@@ -310,14 +317,23 @@ static UIView *floatView = nil;
     self.frame = CGRectMake(x, y, kFloatWidth, kFloatHeight);
     [self updateLabels];
 
-    // 计时器初始状态：不自动启动，等点击后才开始
-    [self stopTimer];
-    self.elapsedSeconds = 0;
-    self.alertPlayed = NO;
-    self.timerLabel.text = @"0";
+    // 暂停模式下计时器应保持运行，若不存在则创建
+    if (self.paused && !self.timer) {
+        [self startTimer];
+    } else if (!self.paused) {
+        // 正常模式但计时器可能因超时停止，不自动重启
+    }
+    // 若正常模式且计时器不存在，保持停止状态（除非用户点击）
+    // 刷新计时显示
+    [self updateTimerLabel];
 }
 
 - (void)updateLabels {
+    if (self.paused) {
+        self.titleLabel.text = @"⏸️";
+        self.contentLabel.text = @"暂停";
+        return;
+    }
     if (self.items.count == 0) {
         self.titleLabel.text = @"";
         self.contentLabel.text = @"";
@@ -328,24 +344,42 @@ static UIView *floatView = nil;
     self.contentLabel.text = item[@"content"];
 }
 
-// 点击处理（含冷却判断）
+- (void)updateTimerLabel {
+    NSInteger hours = self.elapsedSeconds / 3600;
+    NSInteger minutes = (self.elapsedSeconds % 3600) / 60;
+    NSInteger seconds = self.elapsedSeconds % 60;
+    self.timerLabel.text = [NSString stringWithFormat:@"%02ld:%02ld:%02ld", (long)hours, (long)minutes, (long)seconds];
+}
+
+// 单击处理（含冷却判断）
 - (void)handleTap:(UITapGestureRecognizer *)tap {
-    // 冷却时间检查
+    if (self.paused) return; // 暂停模式下忽略单击
+
     NSTimeInterval now = CACurrentMediaTime();
     if (self.lastTapTime > 0 && (now - self.lastTapTime) < self.cooldown) {
         return; // 忽略冷却内的点击
     }
     self.lastTapTime = now;
 
-    // 切换显示内容
     if (self.items.count > 0) {
         self.currentIndex = (self.currentIndex + 1) % self.items.count;
         [self updateLabels];
         [[NSUserDefaults standardUserDefaults] setInteger:self.currentIndex forKey:kIndexKey];
     }
 
-    // 重置计时
     [self resetTimer];
+}
+
+// 双击处理：切换暂停模式
+- (void)handleDoubleTap:(UITapGestureRecognizer *)gesture {
+    if (gesture.state != UIGestureRecognizerStateEnded) return;
+    self.paused = !self.paused;
+    [[NSUserDefaults standardUserDefaults] setBool:self.paused forKey:kPausedKey];
+    [self updateLabels];
+
+    if (self.paused && !self.timer) {
+        [self startTimer]; // 进入暂停且计时器未运行则启动
+    }
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
@@ -416,7 +450,7 @@ static UIView *floatView = nil;
     [self stopTimer];
     self.elapsedSeconds = 0;
     self.alertPlayed = NO;
-    self.timerLabel.text = @"0";
+    [self updateTimerLabel];
     [self startTimer];
 }
 
@@ -439,14 +473,17 @@ static UIView *floatView = nil;
 
 - (void)timerTick {
     self.elapsedSeconds++;
-    self.timerLabel.text = [NSString stringWithFormat:@"%ld", (long)self.elapsedSeconds];
+    [self updateTimerLabel];
 
-    // 超时提醒
-    if (self.elapsedSeconds >= self.timeout && !self.alertPlayed) {
-        self.alertPlayed = YES;
-        // 播放短信提示音 (1007)
-        AudioServicesPlaySystemSound(1007);
-        AudioServicesPlaySystemSound(1007);
+    if (self.elapsedSeconds >= self.timeout) {
+        if (!self.paused) {
+            if (!self.alertPlayed) {
+                self.alertPlayed = YES;
+                AudioServicesPlaySystemSound(1020);
+                [self stopTimer]; // 正常模式响铃后停止计时
+            }
+        }
+        // 暂停模式：不响铃，不停止
     }
 }
 
