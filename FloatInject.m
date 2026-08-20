@@ -12,8 +12,8 @@
 #define kPausedKey     @"FloatInject_paused"     // 暂停模式
 
 // 悬浮窗尺寸
-#define kFloatWidth    45.0
-#define kFloatHeight   60.0
+#define kFloatWidth    42.0
+#define kFloatHeight   55.0
 
 // 默认值
 #define kDefaultTimeout   90
@@ -225,7 +225,7 @@ static UIView *floatView = nil;
         // 标题（红色）
         _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 6, kFloatWidth-8, 16)];
         _titleLabel.textAlignment = NSTextAlignmentCenter;
-        _titleLabel.font = [UIFont boldSystemFontOfSize:13];
+        _titleLabel.font = [UIFont boldSystemFontOfSize:14];
         _titleLabel.textColor = [UIColor redColor];
         _titleLabel.adjustsFontSizeToFitWidth = YES;
         _titleLabel.minimumScaleFactor = 0.5;
