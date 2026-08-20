@@ -11,9 +11,9 @@
 #define kCooldownKey   @"FloatInject_cooldown"   // 冷却时间（秒）
 #define kPausedKey     @"FloatInject_paused"     // 暂停模式
 
-// 悬浮窗总高度
+// 悬浮窗尺寸
+#define kFloatWidth    40.0
 #define kFloatHeight   60.0
-#define kFloatWidth    60.0
 
 // 默认值
 #define kDefaultTimeout   120
@@ -317,15 +317,15 @@ static UIView *floatView = nil;
     self.frame = CGRectMake(x, y, kFloatWidth, kFloatHeight);
     [self updateLabels];
 
-    // 暂停模式下计时器应保持运行，若不存在则创建
-    if (self.paused && !self.timer) {
-        [self startTimer];
-    } else if (!self.paused) {
-        // 正常模式但计时器可能因超时停止，不自动重启
+    // 重置计时器状态：暂停模式则启动，正常模式则停止并清零
+    if (self.paused) {
+        [self resetTimer];   // 暂停模式重启时从0开始计时
+    } else {
+        [self stopTimer];
+        self.elapsedSeconds = 0;
+        self.alertPlayed = NO;
+        [self updateTimerLabel];
     }
-    // 若正常模式且计时器不存在，保持停止状态（除非用户点击）
-    // 刷新计时显示
-    [self updateTimerLabel];
 }
 
 - (void)updateLabels {
@@ -370,16 +370,15 @@ static UIView *floatView = nil;
     [self resetTimer];
 }
 
-// 双击处理：切换暂停模式
+// 双击处理：切换暂停模式，并重置计时器
 - (void)handleDoubleTap:(UITapGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateEnded) return;
     self.paused = !self.paused;
     [[NSUserDefaults standardUserDefaults] setBool:self.paused forKey:kPausedKey];
     [self updateLabels];
 
-    if (self.paused && !self.timer) {
-        [self startTimer]; // 进入暂停且计时器未运行则启动
-    }
+    // 无论进入还是退出暂停模式，计时器都重新开始
+    [self resetTimer];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
