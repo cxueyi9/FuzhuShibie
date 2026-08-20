@@ -16,8 +16,8 @@
 #define kCloseAppKey       @"FloatInject_close_app"        // 倒计时结束是否关闭App
 
 // 悬浮窗尺寸
-#define kFloatWidth    42.0
-#define kFloatHeight   55.0
+#define kFloatWidth    38.0
+#define kFloatHeight   50.0
 
 // 默认值
 #define kDefaultTimeout      120
@@ -60,7 +60,7 @@ static UIView *floatView = nil;
         [self addGestureRecognizer:tapBg];
 
         CGFloat panelW = 290;
-        CGFloat panelH = 460; // 增加高度
+        CGFloat panelH = 660; // 增加高度
         _panelContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, panelW, panelH)];
         _panelContainer.center = self.center;
         _panelContainer.backgroundColor = [UIColor whiteColor];
