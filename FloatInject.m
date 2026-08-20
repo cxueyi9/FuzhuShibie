@@ -2,30 +2,34 @@
 #import <AudioToolbox/AudioServices.h>
 
 // 存储键
-#define kItemsKey      @"FloatInject_items"
-#define kLockedKey     @"FloatInject_locked"
-#define kIndexKey      @"FloatInject_index"
-#define kPosXKey       @"FloatInject_x"
-#define kPosYKey       @"FloatInject_y"
-#define kTimeoutKey    @"FloatInject_timeout"    // 超时提醒（秒）
-#define kCooldownKey   @"FloatInject_cooldown"   // 冷却时间（秒）
-#define kPausedKey     @"FloatInject_paused"     // 暂停模式
-#define kBarkEnabledKey @"FloatInject_bark_enabled" // Bark 推送开关
-#define kBarkKeyKey    @"FloatInject_bark_key"     // Bark 密钥
+#define kItemsKey          @"FloatInject_items"
+#define kLockedKey         @"FloatInject_locked"
+#define kIndexKey          @"FloatInject_index"
+#define kPosXKey           @"FloatInject_x"
+#define kPosYKey           @"FloatInject_y"
+#define kTimeoutKey        @"FloatInject_timeout"          // 正常模式超时提醒（秒）
+#define kCooldownKey       @"FloatInject_cooldown"         // 冷却时间（秒）
+#define kPausedKey         @"FloatInject_paused"           // 暂停模式
+#define kBarkEnabledKey    @"FloatInject_bark_enabled"     // Bark 推送开关
+#define kBarkKeyKey        @"FloatInject_bark_key"         // Bark 密钥
+#define kCountdownKey      @"FloatInject_countdown_min"    // 暂停模式倒计时分钟数
+#define kCloseAppKey       @"FloatInject_close_app"        // 倒计时结束是否关闭App
 
 // 悬浮窗尺寸
 #define kFloatWidth    42.0
 #define kFloatHeight   55.0
 
 // 默认值
-#define kDefaultTimeout   120
-#define kDefaultCooldown  2
+#define kDefaultTimeout      120
+#define kDefaultCooldown     2
+#define kDefaultCountdownMin 40
+#define kDefaultCloseApp     NO
 
 static UIView *floatView = nil;
 
 // ---- 自定义设置面板 ----
 @interface SettingsPanel : UIView <UITextFieldDelegate>
-@property (nonatomic, copy) void (^onSave)(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey);
+@property (nonatomic, copy) void (^onSave)(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp);
 @property (nonatomic, copy) void (^onDismiss)(void);
 @end
 
@@ -34,8 +38,10 @@ static UIView *floatView = nil;
     UITextField *_timeoutField;
     UITextField *_cooldownField;
     UITextField *_barkKeyField;
+    UITextField *_countdownField;
     UISwitch   *_lockSwitch;
     UISwitch   *_barkSwitch;
+    UISwitch   *_closeAppSwitch;
     UIView     *_panelContainer;
 }
 
@@ -45,14 +51,16 @@ static UIView *floatView = nil;
                       timeout:(NSInteger)timeout
                      cooldown:(NSInteger)cooldown
                   barkEnabled:(BOOL)barkEnabled
-                      barkKey:(NSString *)barkKey {
+                      barkKey:(NSString *)barkKey
+                 countdownMin:(NSInteger)countdownMin
+                     closeApp:(BOOL)closeApp {
     if (self = [super initWithFrame:[UIScreen mainScreen].bounds]) {
         self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
         UITapGestureRecognizer *tapBg = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(cancel)];
         [self addGestureRecognizer:tapBg];
 
         CGFloat panelW = 290;
-        CGFloat panelH = 390; // 增加高度以容纳新控件
+        CGFloat panelH = 460; // 增加高度
         _panelContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, panelW, panelH)];
         _panelContainer.center = self.center;
         _panelContainer.backgroundColor = [UIColor whiteColor];
@@ -118,6 +126,22 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_cooldownField];
         y += 42;
 
+        // 倒计时分钟数
+        UILabel *countdownLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, panelW-40, 20)];
+        countdownLabel.text = @"暂停倒计时（分钟）";
+        countdownLabel.font = [UIFont systemFontOfSize:14];
+        [_panelContainer addSubview:countdownLabel];
+        y += 24;
+
+        _countdownField = [[UITextField alloc] initWithFrame:CGRectMake(20, y, panelW-40, 34)];
+        _countdownField.borderStyle = UITextBorderStyleRoundedRect;
+        _countdownField.font = [UIFont systemFontOfSize:14];
+        _countdownField.keyboardType = UIKeyboardTypeNumberPad;
+        _countdownField.text = [@(countdownMin) stringValue];
+        _countdownField.delegate = self;
+        [_panelContainer addSubview:_countdownField];
+        y += 42;
+
         // 锁定开关
         UILabel *lockLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 100, 31)];
         lockLabel.text = @"锁定位置";
@@ -157,6 +181,17 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_barkKeyField];
         y += 42;
 
+        // 倒计时结束关闭App开关
+        UILabel *closeAppLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 180, 31)];
+        closeAppLabel.text = @"倒计时结束关闭App";
+        closeAppLabel.font = [UIFont systemFontOfSize:14];
+        [_panelContainer addSubview:closeAppLabel];
+
+        _closeAppSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(panelW-70, y, 51, 31)];
+        _closeAppSwitch.on = closeApp;
+        [_panelContainer addSubview:_closeAppSwitch];
+        y += 40;
+
         // 保存按钮
         UIButton *saveBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         saveBtn.frame = CGRectMake(20, y, panelW-40, 40);
@@ -189,7 +224,10 @@ static UIView *floatView = nil;
     if (cooldown <= 0) cooldown = kDefaultCooldown;
     BOOL barkEnabled = _barkSwitch.on;
     NSString *barkKey = _barkKeyField.text ?: @"";
-    if (self.onSave) self.onSave(text, locked, timeout, cooldown, barkEnabled, barkKey);
+    NSInteger countdownMin = [_countdownField.text integerValue];
+    if (countdownMin <= 0) countdownMin = kDefaultCountdownMin;
+    BOOL closeApp = _closeAppSwitch.on;
+    if (self.onSave) self.onSave(text, locked, timeout, cooldown, barkEnabled, barkKey, countdownMin, closeApp);
 }
 
 - (void)dismiss {
@@ -237,12 +275,15 @@ static UIView *floatView = nil;
 @property (nonatomic, assign) NSInteger currentIndex;
 @property (nonatomic, strong) NSArray<NSDictionary *> *items;
 @property (nonatomic, assign) BOOL locked;
-@property (nonatomic, assign) NSInteger timeout;
-@property (nonatomic, assign) NSInteger cooldown;
-@property (nonatomic, assign) BOOL paused;                     // 暂停模式
+@property (nonatomic, assign) NSInteger timeout;          // 正常模式超时秒数
+@property (nonatomic, assign) NSInteger cooldown;         // 冷却秒数
+@property (nonatomic, assign) BOOL paused;                // 暂停模式
+@property (nonatomic, assign) NSInteger countdownSeconds; // 暂停模式剩余秒数
+@property (nonatomic, assign) NSInteger countdownMin;     // 暂停模式总分钟数
+@property (nonatomic, assign) BOOL closeAppOnEnd;         // 倒计时结束是否关闭App
 
 @property (nonatomic, strong) NSTimer *timer;
-@property (nonatomic, assign) NSInteger elapsedSeconds;
+@property (nonatomic, assign) NSInteger elapsedSeconds;   // 正常模式正计时
 @property (nonatomic, assign) BOOL alertPlayed;
 @property (nonatomic, assign) NSTimeInterval lastTapTime;
 @end
@@ -281,7 +322,7 @@ static UIView *floatView = nil;
         _timerLabel.textAlignment = NSTextAlignmentCenter;
         _timerLabel.font = [UIFont systemFontOfSize:7];
         _timerLabel.textColor = [UIColor darkGrayColor];
-        _timerLabel.text = @"00:00:00";
+        _timerLabel.text = @"00:00";
         [self addSubview:_timerLabel];
 
         // 单击手势
@@ -316,6 +357,9 @@ static UIView *floatView = nil;
     self.cooldown = [def integerForKey:kCooldownKey];
     if (self.cooldown <= 0) self.cooldown = kDefaultCooldown;
     self.paused = [def boolForKey:kPausedKey];
+    self.countdownMin = [def integerForKey:kCountdownKey];
+    if (self.countdownMin <= 0) self.countdownMin = kDefaultCountdownMin;
+    self.closeAppOnEnd = [def boolForKey:kCloseAppKey];
 
     for (UIGestureRecognizer *gr in self.gestureRecognizers) {
         if ([gr isKindOfClass:[UIPanGestureRecognizer class]]) {
@@ -353,10 +397,12 @@ static UIView *floatView = nil;
     self.frame = CGRectMake(x, y, kFloatWidth, kFloatHeight);
     [self updateLabels];
 
-    // 计时器状态：暂停模式则重置并启动；正常模式停止并清零
+    // 计时器状态
     if (self.paused) {
-        [self resetTimer];
+        // 暂停模式：重置倒计时并启动
+        [self resetCountdown];
     } else {
+        // 正常模式：停止计时，清零正计时
         [self stopTimer];
         self.elapsedSeconds = 0;
         self.alertPlayed = NO;
@@ -380,11 +426,12 @@ static UIView *floatView = nil;
     self.contentLabel.text = item[@"content"];
 }
 
+// 更新计时显示：分:秒
 - (void)updateTimerLabel {
-    NSInteger hours = self.elapsedSeconds / 3600;
-    NSInteger minutes = (self.elapsedSeconds % 3600) / 60;
-    NSInteger seconds = self.elapsedSeconds % 60;
-    self.timerLabel.text = [NSString stringWithFormat:@"%02ld:%02ld:%02ld", (long)hours, (long)minutes, (long)seconds];
+    NSInteger totalSeconds = self.paused ? self.countdownSeconds : self.elapsedSeconds;
+    NSInteger minutes = totalSeconds / 60;
+    NSInteger seconds = totalSeconds % 60;
+    self.timerLabel.text = [NSString stringWithFormat:@"%02ld:%02ld", (long)minutes, (long)seconds];
 }
 
 // 单击处理（含冷却判断）
@@ -403,7 +450,7 @@ static UIView *floatView = nil;
         [[NSUserDefaults standardUserDefaults] setInteger:self.currentIndex forKey:kIndexKey];
     }
 
-    [self resetTimer];
+    [self resetTimer]; // 正常模式重置正计时并启动
     [self sendBarkNotificationIfEnabled];
 }
 
@@ -414,8 +461,12 @@ static UIView *floatView = nil;
     [[NSUserDefaults standardUserDefaults] setBool:self.paused forKey:kPausedKey];
     [self updateLabels];
 
-    // 无论进入还是退出暂停模式，计时器都重新开始
-    [self resetTimer];
+    // 无论进入还是退出暂停模式，都重新开始对应计时
+    if (self.paused) {
+        [self resetCountdown];
+    } else {
+        [self resetTimer];
+    }
     [self sendBarkNotificationIfEnabled];
 }
 
@@ -428,7 +479,6 @@ static UIView *floatView = nil;
     NSString *barkKey = [def objectForKey:kBarkKeyKey];
     if (!barkKey || barkKey.length == 0) return;
 
-    // 构建推送内容：当前时间 + 悬浮窗内容文本
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
     NSString *timeStr = [formatter stringFromDate:[NSDate date]];
@@ -444,18 +494,13 @@ static UIView *floatView = nil;
     }
 
     NSString *pushContent = [NSString stringWithFormat:@"%@ %@", timeStr, currentText];
-    // URL 编码推送内容
     NSString *encodedContent = [pushContent stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
     NSString *urlString = [NSString stringWithFormat:@"https://api.day.app/%@/%@?group=YDB", barkKey, encodedContent];
-
     NSURL *url = [NSURL URLWithString:urlString];
     if (!url) return;
 
-    // 异步发送
     NSURLSession *session = [NSURLSession sharedSession];
-    NSURLSessionDataTask *task = [session dataTaskWithURL:url completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
-        // 不处理结果
-    }];
+    NSURLSessionDataTask *task = [session dataTaskWithURL:url completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {}];
     [task resume];
 }
 
@@ -495,6 +540,8 @@ static UIView *floatView = nil;
     BOOL currentLocked = self.locked;
     BOOL currentBarkEnabled = [def boolForKey:kBarkEnabledKey];
     NSString *currentBarkKey = [def objectForKey:kBarkKeyKey] ?: @"";
+    NSInteger currentCountdownMin = self.countdownMin;
+    BOOL currentCloseApp = self.closeAppOnEnd;
 
     __weak typeof(self) weakSelf = self;
     UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
@@ -506,8 +553,10 @@ static UIView *floatView = nil;
                                                         timeout:currentTimeout
                                                        cooldown:currentCooldown
                                                     barkEnabled:currentBarkEnabled
-                                                        barkKey:currentBarkKey];
-    panel.onSave = ^(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey) {
+                                                        barkKey:currentBarkKey
+                                                   countdownMin:currentCountdownMin
+                                                       closeApp:currentCloseApp];
+    panel.onSave = ^(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
         NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
@@ -517,6 +566,8 @@ static UIView *floatView = nil;
         [def setInteger:cooldown forKey:kCooldownKey];
         [def setBool:barkEnabled forKey:kBarkEnabledKey];
         [def setObject:barkKey forKey:kBarkKeyKey];
+        [def setInteger:countdownMin forKey:kCountdownKey];
+        [def setBool:closeApp forKey:kCloseAppKey];
         [def synchronize];
         [strongSelf reloadFromDefaults];
     };
@@ -530,10 +581,19 @@ static UIView *floatView = nil;
 }
 
 // ---- 计时器管理 ----
+// 正常模式：重置正计时并启动
 - (void)resetTimer {
     [self stopTimer];
     self.elapsedSeconds = 0;
     self.alertPlayed = NO;
+    [self updateTimerLabel];
+    [self startTimer];
+}
+
+// 暂停模式：重置倒计时并启动
+- (void)resetCountdown {
+    [self stopTimer];
+    self.countdownSeconds = self.countdownMin * 60;
     [self updateTimerLabel];
     [self startTimer];
 }
@@ -556,18 +616,32 @@ static UIView *floatView = nil;
 }
 
 - (void)timerTick {
-    self.elapsedSeconds++;
-    [self updateTimerLabel];
+    if (self.paused) {
+        // 暂停模式：倒计时
+        self.countdownSeconds--;
+        if (self.countdownSeconds < 0) self.countdownSeconds = 0;
+        [self updateTimerLabel];
 
-    if (self.elapsedSeconds >= self.timeout) {
-        if (!self.paused) {
+        if (self.countdownSeconds <= 0) {
+            [self stopTimer];
+            if (self.closeAppOnEnd) {
+                // 倒计时结束且设置关闭App
+                exit(0);
+            }
+            // 不关闭App则保持暂停模式，倒计时为0
+        }
+    } else {
+        // 正常模式：正计时
+        self.elapsedSeconds++;
+        [self updateTimerLabel];
+
+        if (self.elapsedSeconds >= self.timeout) {
             if (!self.alertPlayed) {
                 self.alertPlayed = YES;
                 AudioServicesPlaySystemSound(1020);
                 [self stopTimer]; // 正常模式响铃后停止计时
             }
         }
-        // 暂停模式：不响铃，不停止
     }
 }
 
