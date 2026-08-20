@@ -10,20 +10,22 @@
 #define kTimeoutKey    @"FloatInject_timeout"    // 超时提醒（秒）
 #define kCooldownKey   @"FloatInject_cooldown"   // 冷却时间（秒）
 #define kPausedKey     @"FloatInject_paused"     // 暂停模式
+#define kBarkEnabledKey @"FloatInject_bark_enabled" // Bark 推送开关
+#define kBarkKeyKey    @"FloatInject_bark_key"     // Bark 密钥
 
 // 悬浮窗尺寸
 #define kFloatWidth    42.0
 #define kFloatHeight   55.0
 
 // 默认值
-#define kDefaultTimeout   90
+#define kDefaultTimeout   120
 #define kDefaultCooldown  2
 
 static UIView *floatView = nil;
 
 // ---- 自定义设置面板 ----
 @interface SettingsPanel : UIView <UITextFieldDelegate>
-@property (nonatomic, copy) void (^onSave)(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown);
+@property (nonatomic, copy) void (^onSave)(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey);
 @property (nonatomic, copy) void (^onDismiss)(void);
 @end
 
@@ -31,7 +33,9 @@ static UIView *floatView = nil;
     UITextField *_itemsField;
     UITextField *_timeoutField;
     UITextField *_cooldownField;
+    UITextField *_barkKeyField;
     UISwitch   *_lockSwitch;
+    UISwitch   *_barkSwitch;
     UIView     *_panelContainer;
 }
 
@@ -39,14 +43,16 @@ static UIView *floatView = nil;
                         items:(NSString *)items
                        locked:(BOOL)locked
                       timeout:(NSInteger)timeout
-                     cooldown:(NSInteger)cooldown {
+                     cooldown:(NSInteger)cooldown
+                  barkEnabled:(BOOL)barkEnabled
+                      barkKey:(NSString *)barkKey {
     if (self = [super initWithFrame:[UIScreen mainScreen].bounds]) {
         self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
         UITapGestureRecognizer *tapBg = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(cancel)];
         [self addGestureRecognizer:tapBg];
 
         CGFloat panelW = 290;
-        CGFloat panelH = 300;
+        CGFloat panelH = 390; // 增加高度以容纳新控件
         _panelContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, panelW, panelH)];
         _panelContainer.center = self.center;
         _panelContainer.backgroundColor = [UIColor whiteColor];
@@ -123,6 +129,34 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_lockSwitch];
         y += 40;
 
+        // Bark 推送开关
+        UILabel *barkSwitchLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 100, 31)];
+        barkSwitchLabel.text = @"Bark推送";
+        barkSwitchLabel.font = [UIFont systemFontOfSize:14];
+        [_panelContainer addSubview:barkSwitchLabel];
+
+        _barkSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(panelW-70, y, 51, 31)];
+        _barkSwitch.on = barkEnabled;
+        [_panelContainer addSubview:_barkSwitch];
+        y += 40;
+
+        // Bark 密钥输入框
+        UILabel *barkKeyLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, panelW-40, 18)];
+        barkKeyLabel.text = @"Bark 密钥";
+        barkKeyLabel.font = [UIFont systemFontOfSize:12];
+        barkKeyLabel.textColor = [UIColor grayColor];
+        [_panelContainer addSubview:barkKeyLabel];
+        y += 20;
+
+        _barkKeyField = [[UITextField alloc] initWithFrame:CGRectMake(20, y, panelW-40, 34)];
+        _barkKeyField.borderStyle = UITextBorderStyleRoundedRect;
+        _barkKeyField.font = [UIFont systemFontOfSize:13];
+        _barkKeyField.text = barkKey ?: @"";
+        _barkKeyField.placeholder = @"请输入Bark密钥";
+        _barkKeyField.delegate = self;
+        [_panelContainer addSubview:_barkKeyField];
+        y += 42;
+
         // 保存按钮
         UIButton *saveBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         saveBtn.frame = CGRectMake(20, y, panelW-40, 40);
@@ -153,7 +187,9 @@ static UIView *floatView = nil;
     if (timeout <= 0) timeout = kDefaultTimeout;
     NSInteger cooldown = [_cooldownField.text integerValue];
     if (cooldown <= 0) cooldown = kDefaultCooldown;
-    if (self.onSave) self.onSave(text, locked, timeout, cooldown);
+    BOOL barkEnabled = _barkSwitch.on;
+    NSString *barkKey = _barkKeyField.text ?: @"";
+    if (self.onSave) self.onSave(text, locked, timeout, cooldown, barkEnabled, barkKey);
 }
 
 - (void)dismiss {
@@ -222,7 +258,7 @@ static UIView *floatView = nil;
         self.layer.shadowOpacity = 0.3;
         self.layer.shadowRadius = 4;
 
-        // 标题（红色）
+        // 标题（红色）字号14
         _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 6, kFloatWidth-8, 16)];
         _titleLabel.textAlignment = NSTextAlignmentCenter;
         _titleLabel.font = [UIFont boldSystemFontOfSize:14];
@@ -231,17 +267,17 @@ static UIView *floatView = nil;
         _titleLabel.minimumScaleFactor = 0.5;
         [self addSubview:_titleLabel];
 
-        // 内容（蓝色）
+        // 内容（蓝色）字号12
         _contentLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 22, kFloatWidth-8, 16)];
         _contentLabel.textAlignment = NSTextAlignmentCenter;
-        _contentLabel.font = [UIFont systemFontOfSize:13];
+        _contentLabel.font = [UIFont systemFontOfSize:12];
         _contentLabel.textColor = [UIColor blueColor];
         _contentLabel.adjustsFontSizeToFitWidth = YES;
         _contentLabel.minimumScaleFactor = 0.5;
         [self addSubview:_contentLabel];
 
-        // 计时小字（深灰色）
-        _timerLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 40, kFloatWidth-8, 14)];
+        // 计时小字（深灰色）字号7
+        _timerLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 38, kFloatWidth-8, 14)];
         _timerLabel.textAlignment = NSTextAlignmentCenter;
         _timerLabel.font = [UIFont systemFontOfSize:7];
         _timerLabel.textColor = [UIColor darkGrayColor];
@@ -317,9 +353,9 @@ static UIView *floatView = nil;
     self.frame = CGRectMake(x, y, kFloatWidth, kFloatHeight);
     [self updateLabels];
 
-    // 重置计时器状态：暂停模式则启动，正常模式则停止并清零
+    // 计时器状态：暂停模式则重置并启动；正常模式停止并清零
     if (self.paused) {
-        [self resetTimer];   // 暂停模式重启时从0开始计时
+        [self resetTimer];
     } else {
         [self stopTimer];
         self.elapsedSeconds = 0;
@@ -368,6 +404,7 @@ static UIView *floatView = nil;
     }
 
     [self resetTimer];
+    [self sendBarkNotificationIfEnabled];
 }
 
 // 双击处理：切换暂停模式，并重置计时器
@@ -379,6 +416,47 @@ static UIView *floatView = nil;
 
     // 无论进入还是退出暂停模式，计时器都重新开始
     [self resetTimer];
+    [self sendBarkNotificationIfEnabled];
+}
+
+// 发送 Bark 推送（如果开启且密钥有效）
+- (void)sendBarkNotificationIfEnabled {
+    NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
+    BOOL enabled = [def boolForKey:kBarkEnabledKey];
+    if (!enabled) return;
+
+    NSString *barkKey = [def objectForKey:kBarkKeyKey];
+    if (!barkKey || barkKey.length == 0) return;
+
+    // 构建推送内容：当前时间 + 悬浮窗内容文本
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    NSString *timeStr = [formatter stringFromDate:[NSDate date]];
+
+    NSString *currentText;
+    if (self.paused) {
+        currentText = @"⏸️ 暂停";
+    } else if (self.items.count > 0) {
+        NSDictionary *item = self.items[self.currentIndex];
+        currentText = [NSString stringWithFormat:@"%@ %@", item[@"title"], item[@"content"]];
+    } else {
+        currentText = @"";
+    }
+
+    NSString *pushContent = [NSString stringWithFormat:@"%@ %@", timeStr, currentText];
+    // URL 编码推送内容
+    NSString *encodedContent = [pushContent stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
+    NSString *urlString = [NSString stringWithFormat:@"https://api.day.app/%@/%@?group=YDB", barkKey, encodedContent];
+
+    NSURL *url = [NSURL URLWithString:urlString];
+    if (!url) return;
+
+    // 异步发送
+    NSURLSession *session = [NSURLSession sharedSession];
+    NSURLSessionDataTask *task = [session dataTaskWithURL:url completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+        // 不处理结果
+    }];
+    [task resume];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
@@ -409,11 +487,14 @@ static UIView *floatView = nil;
         [gen impactOccurred];
     }
 
-    NSString *currentItems = [[NSUserDefaults standardUserDefaults] objectForKey:kItemsKey];
+    NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
+    NSString *currentItems = [def objectForKey:kItemsKey];
     if (!currentItems) currentItems = @"示例,内容;第二条,信息";
     NSInteger currentTimeout = self.timeout;
     NSInteger currentCooldown = self.cooldown;
     BOOL currentLocked = self.locked;
+    BOOL currentBarkEnabled = [def boolForKey:kBarkEnabledKey];
+    NSString *currentBarkKey = [def objectForKey:kBarkKeyKey] ?: @"";
 
     __weak typeof(self) weakSelf = self;
     UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
@@ -423,8 +504,10 @@ static UIView *floatView = nil;
                                                           items:currentItems
                                                          locked:currentLocked
                                                         timeout:currentTimeout
-                                                       cooldown:currentCooldown];
-    panel.onSave = ^(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown) {
+                                                       cooldown:currentCooldown
+                                                    barkEnabled:currentBarkEnabled
+                                                        barkKey:currentBarkKey];
+    panel.onSave = ^(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
         NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
@@ -432,6 +515,8 @@ static UIView *floatView = nil;
         [def setBool:locked forKey:kLockedKey];
         [def setInteger:timeout forKey:kTimeoutKey];
         [def setInteger:cooldown forKey:kCooldownKey];
+        [def setBool:barkEnabled forKey:kBarkEnabledKey];
+        [def setObject:barkKey forKey:kBarkKeyKey];
         [def synchronize];
         [strongSelf reloadFromDefaults];
     };
