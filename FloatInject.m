@@ -467,32 +467,33 @@ static UIView *floatView = nil;
     self.frame = CGRectMake(x, y, kFloatWidth, kFloatHeight);
     [self updateLabels];
 
-    if (self.paused) {
-        NSTimeInterval startTime = [def doubleForKey:kCountdownStartKey];
-        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
-        if (startTime <= 0) {
-            startTime = now;
-            [def setDouble:startTime forKey:kCountdownStartKey];
-        }
-        NSInteger elapsed = (NSInteger)(now - startTime);
-        NSInteger totalSeconds = self.countdownMin * 60;
-        NSInteger remaining = totalSeconds - elapsed;
-        self.countdownSeconds = remaining;
-        [self updateTimerLabel];
-        // 如果倒计时已经为0或负数，根据closeAppOnEnd决定是否立即关闭或调度延迟操作
-        if (self.countdownSeconds = 0) {
-            if (self.closeAppOnEnd) {
-                [self stopTimer];
-                exit(0);
-            } else {
-                if (!self.delayedActionScheduled) {
-                    self.delayedActionScheduled = YES;
-                    [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
-                }
+if (self.paused) {
+    NSTimeInterval startTime = [def doubleForKey:kCountdownStartKey];
+    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+    if (startTime <= 0) {
+        startTime = now;
+        [def setDouble:startTime forKey:kCountdownStartKey];
+    }
+    NSInteger elapsed = (NSInteger)(now - startTime);
+    NSInteger totalSeconds = self.countdownMin * 60;
+    NSInteger remaining = totalSeconds - elapsed;
+    self.countdownSeconds = remaining;
+    [self updateTimerLabel];
+    // 如果倒计时已经为0或负数，根据 closeAppOnEnd 决定是否调度延迟操作
+    if (self.countdownSeconds <= 0) {
+        if (self.closeAppOnEnd) {
+            // 关闭 APP 模式：倒计时归零时关闭，但启动时不自动关闭，只显示负值，等 timerTick 触发
+            // 不执行任何操作，让计时器继续运行，当 countdownSeconds 变为 0 时触发关闭
+        } else {
+            // 非关闭模式：如果倒计时已经为0或负数，且尚未调度，则调度延迟点击
+            if (!self.delayedActionScheduled) {
+                self.delayedActionScheduled = YES;
+                [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
             }
         }
-        [self startTimer];
-        [self updateIdleTimerDisabled];
+    }
+    [self startTimer];
+    [self updateIdleTimerDisabled];
     } else {
         [self stopTimer];
         self.elapsedSeconds = 0;
@@ -799,27 +800,27 @@ static UIView *floatView = nil;
     }
 }
 
+// ===== 修改 timerTick 方法 =====
 - (void)timerTick {
     if (self.paused) {
         self.countdownSeconds--;
         [self updateTimerLabel];
-        // 当倒计时变为 -1 或更小，且尚未调度延迟操作
-        if (self.countdownSeconds <= -1 && !self.delayedActionScheduled) {
-            // 如果 closeAppOnEnd 为 YES，则关闭 APP（原有逻辑）
+        // 当倒计时变为 0 时触发操作
+        if (self.countdownSeconds == 0) {
             if (self.closeAppOnEnd) {
+                // 关闭 APP
                 [self stopTimer];
                 exit(0);
             } else {
-                // 否则调度延迟点击
-                self.delayedActionScheduled = YES;
-                [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
+                // 调度延迟点击
+                if (!self.delayedActionScheduled) {
+                    self.delayedActionScheduled = YES;
+                    [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
+                }
             }
         }
-        // 如果 closeAppOnEnd == YES 且倒计时恰好为0，则立即关闭
-        if (self.countdownSeconds == 0 && self.closeAppOnEnd) {
-            [self stopTimer];
-            exit(0);
-        }
+        // 小于 0 不执行任何操作（既不会关闭也不会再次调度）
+        // 注意：如果倒计时已经小于 0，且 closeAppOnEnd == NO，但 delayedActionScheduled 已经为 YES，不会重复调度
     } else {
         self.elapsedSeconds++;
         [self updateTimerLabel];
