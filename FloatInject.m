@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioServices.h>
+#import <malloc/malloc.h>
 
 // ===== 导入触摸模拟所需头文件 =====
 #import "UITouch-KIFAdditions.h"
@@ -524,6 +525,26 @@ static UIView *floatView = nil;
     }
 }
 
+- (void)performMemoryCleanup {
+    // 1. 清理 URL 缓存
+    [[NSURLCache sharedURLCache] removeAllCachedResponses];
+    
+    // 2. 提示系统释放 malloc 内存（释放可释放的 malloc 区域）
+    malloc_zone_pressure_relief(malloc_default_zone(), 0);
+    
+    // 3. 发送内存警告通知，让系统回收内存（如 UIKit 会清理图片缓存等）
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSNotificationCenter defaultCenter] postNotificationName:UIApplicationDidReceiveMemoryWarningNotification object:nil];
+    });
+    
+    // 4. 强制 drain autorelease pool
+    @autoreleasepool {
+        // 空池子，帮助释放之前的临时对象
+    }
+    
+    NSLog(@"[FloatInject] 🧹 Memory cleanup triggered at index 0");
+}
+
 - (void)handleTap:(UITapGestureRecognizer *)tap {
     if (self.paused) return;
     NSTimeInterval now = CACurrentMediaTime();
@@ -535,6 +556,10 @@ static UIView *floatView = nil;
         self.currentIndex = (self.currentIndex + 1) % self.items.count;
         [self updateLabels];
         [[NSUserDefaults standardUserDefaults] setInteger:self.currentIndex forKey:kIndexKey];
+        // 🧹 当回到第一个时触发内存清理
+        if (self.currentIndex == 0) {
+            [self performMemoryCleanup];
+        }
     }
     [self resetTimer];
     [self sendBarkNotificationIfEnabled];
