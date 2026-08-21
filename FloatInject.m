@@ -72,7 +72,8 @@ static UIView *floatView = nil;
                       clickX:(CGFloat)clickX
                       clickY:(CGFloat)clickY
                        delay:(CGFloat)delay {
-    if (self = [super initWithFrame:[UIScreen mainScreen].bounds]) {
+    self = [super initWithFrame:[UIScreen mainScreen].bounds];
+    if (self) {
         self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
         UITapGestureRecognizer *tapBg = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(cancel)];
         [self addGestureRecognizer:tapBg];
@@ -240,7 +241,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_barkKeyField];
         y += 42;
 
-        // 倒计时结束关闭App开关（保留但不再使用）
+        // 倒计时结束关闭App开关
         UILabel *closeAppLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 180, 31)];
         closeAppLabel.text = @"倒计时结束关闭App";
         closeAppLabel.font = [UIFont systemFontOfSize:14];
@@ -285,7 +286,7 @@ static UIView *floatView = nil;
     NSString *barkKey = _barkKeyField.text ?: @"";
     NSInteger countdownMin = [_countdownField.text integerValue];
     if (countdownMin <= 0) countdownMin = kDefaultCountdownMin;
-    BOOL closeApp = _closeAppSwitch.on; // 保留但不再使用
+    BOOL closeApp = _closeAppSwitch.on;
     CGFloat clickX = [_clickXField.text doubleValue];
     if (clickX <= 0) clickX = kDefaultClickX;
     CGFloat clickY = [_clickYField.text doubleValue];
@@ -479,26 +480,19 @@ static UIView *floatView = nil;
         NSInteger remaining = totalSeconds - elapsed;
         self.countdownSeconds = remaining;
         [self updateTimerLabel];
-        // 如果倒计时已经小于 -1（即 <= -2），且尚未调度，则调度延迟点击（因为已经错过了触发时机）
-        if (self.countdownSeconds <= -2 && !self.delayedActionScheduled) {
-            self.delayedActionScheduled = YES;
-            [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
-        }
-        // 如果 countdownSeconds == -1，也调度（因为即将触发点击），但若 closeAppOnEnd == YES 且刚恢复时可能倒计时为 -1，但关闭只发生在从0变到-1的瞬间，恢复时不会触发关闭，所以这里也统一调度延迟点击（因为小于等于 -1 都应该触发点击）
+        // 如果倒计时已经为 -1 或更小，调度延迟点击
         if (self.countdownSeconds <= -1 && !self.delayedActionScheduled) {
             self.delayedActionScheduled = YES;
             [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
         }
         [self startTimer];
-        [self updateIdleTimerDisabled];
     } else {
         [self stopTimer];
         self.elapsedSeconds = 0;
         self.alertPlayed = NO;
         [self updateTimerLabel];
-        [UIApplication sharedApplication].idleTimerDisabled = NO;
     }
-}}
+}
 
 - (void)updateLabels {
     if (self.paused) {
@@ -530,10 +524,6 @@ static UIView *floatView = nil;
     }
 }
 
-- (void)updateIdleTimerDisabled {
-    [UIApplication sharedApplication].idleTimerDisabled = NO; // 不再控制，保留但禁用
-}
-
 - (void)handleTap:(UITapGestureRecognizer *)tap {
     if (self.paused) return;
     NSTimeInterval now = CACurrentMediaTime();
@@ -550,7 +540,6 @@ static UIView *floatView = nil;
     [self sendBarkNotificationIfEnabled];
 }
 
-// ===== 红圈圈（使用独立窗口） =====
 - (void)showTapMarkerAtPoint:(CGPoint)point {
     dispatch_async(dispatch_get_main_queue(), ^{
         __block UIWindow *markerWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
@@ -615,7 +604,6 @@ static UIView *floatView = nil;
     }
 }
 
-// ===== 立即执行点击 =====
 - (void)performClickNow {
     UIWindow *targetWindow = nil;
     for (UIWindow *w in [UIApplication sharedApplication].windows) {
@@ -636,7 +624,6 @@ static UIView *floatView = nil;
     }
 }
 
-// ===== 延迟执行点击并退出暂停 =====
 - (void)performDelayedClick {
     if (!self.paused) {
         self.delayedActionScheduled = NO;
@@ -653,7 +640,6 @@ static UIView *floatView = nil;
     NSLog(@"[FloatInject] 🔄 Exited pause mode after delayed click");
 }
 
-// ===== 双击：进入暂停并立即发送点击 =====
 - (void)handleDoubleTap:(UITapGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateEnded) return;
     self.paused = !self.paused;
@@ -672,7 +658,6 @@ static UIView *floatView = nil;
     [self sendBarkNotificationIfEnabled];
 }
 
-// ---- 其他方法（handlePan, handleLongPress, resetTimer, resetCountdown, startTimer, stopTimer, timerTick, sendBarkNotificationIfEnabled, dealloc） ----
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
     if (self.locked) return;
     CGPoint translation = [pan translationInView:self.superview];
@@ -709,7 +694,7 @@ static UIView *floatView = nil;
     BOOL currentBarkEnabled = [def boolForKey:kBarkEnabledKey];
     NSString *currentBarkKey = [def objectForKey:kBarkKeyKey] ?: @"";
     NSInteger currentCountdownMin = self.countdownMin;
-    BOOL currentCloseApp = self.closeAppOnEnd; // 保留但不再使用
+    BOOL currentCloseApp = self.closeAppOnEnd;
     CGFloat currentClickX = self.clickX;
     CGFloat currentClickY = self.clickY;
     CGFloat currentDelay = self.delaySeconds;
@@ -793,22 +778,20 @@ static UIView *floatView = nil;
     }
 }
 
-// ===== timerTick（核心逻辑） =====
 - (void)timerTick {
     if (self.paused) {
         self.countdownSeconds--;
         [self updateTimerLabel];
-        // 1. 当倒计时变为 0 时，若 closeAppOnEnd == YES，则关闭 APP（仅此一次）
+        // 1. 当倒计时变为 0 时，若 closeAppOnEnd == YES，则关闭 APP
         if (self.countdownSeconds == 0 && self.closeAppOnEnd) {
             [self stopTimer];
             exit(0);
         }
-        // 2. 当倒计时变为 -1 时（即从 0 变为 -1 的瞬间），无论开关状态，调度延迟点击（如果尚未调度）
+        // 2. 当倒计时变为 -1 时，无论开关状态，调度延迟点击
         if (self.countdownSeconds == -1 && !self.delayedActionScheduled) {
             self.delayedActionScheduled = YES;
             [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
         }
-        // 其他情况（小于 -1）忽略
     } else {
         self.elapsedSeconds++;
         [self updateTimerLabel];
@@ -820,7 +803,7 @@ static UIView *floatView = nil;
             }
         }
     }
-
+}
 
 - (void)sendBarkNotificationIfEnabled {
     NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
