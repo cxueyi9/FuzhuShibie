@@ -480,7 +480,7 @@ static UIView *floatView = nil;
         self.countdownSeconds = remaining;
         [self updateTimerLabel];
         // 如果倒计时已经为0或负数，根据closeAppOnEnd决定是否立即关闭或调度延迟操作
-        if (self.countdownSeconds <= 0) {
+        if (self.countdownSeconds = 0) {
             if (self.closeAppOnEnd) {
                 [self stopTimer];
                 exit(0);
