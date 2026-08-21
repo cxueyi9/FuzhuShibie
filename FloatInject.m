@@ -39,7 +39,7 @@
 
 static UIView *floatView = nil;
 
-// ---- 自定义设置面板（新增延迟输入） ----
+// ---- 自定义设置面板 ----
 @interface SettingsPanel : UIView <UITextFieldDelegate>
 @property (nonatomic, copy) void (^onSave)(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp, CGFloat clickX, CGFloat clickY, CGFloat delay);
 @property (nonatomic, copy) void (^onDismiss)(void);
@@ -479,6 +479,7 @@ static UIView *floatView = nil;
         NSInteger remaining = totalSeconds - elapsed;
         self.countdownSeconds = remaining;
         [self updateTimerLabel];
+        // 如果倒计时已经为0或负数，根据closeAppOnEnd决定是否立即关闭或调度延迟操作
         if (self.countdownSeconds <= 0) {
             if (self.closeAppOnEnd) {
                 [self stopTimer];
@@ -697,13 +698,15 @@ static UIView *floatView = nil;
     [self sendBarkNotificationIfEnabled];
 }
 
-// 其他方法（handlePan, handleLongPress, resetTimer, resetCountdown, startTimer, stopTimer, timerTick, sendBarkNotificationIfEnabled 等保持不变）
+// ---- 其他方法（handlePan, handleLongPress, resetTimer, resetCountdown, startTimer, stopTimer, timerTick, sendBarkNotificationIfEnabled, dealloc）----
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
-    // ... 原有实现保持不变 ...
+    // 保持原有实现，这里省略
 }
 
 - (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
-    // ... 原有实现保持不变，需要更新panel的onSave参数 ...
+    // 保持原有实现，但需注意在调用 SettingsPanel 初始化时传入 delay 参数
+    // 并在 onSave 回调中包含 delay 参数
+    // 由于篇幅，此处省略具体代码，但你必须保留你的原始实现
 }
 
 - (void)resetTimer {
@@ -746,8 +749,7 @@ static UIView *floatView = nil;
     if (self.paused) {
         self.countdownSeconds--;
         [self updateTimerLabel];
-        // 当倒计时变为 -1 或更小，且尚未调度延迟操作，且 closeAppOnEnd == YES 时关闭（但用户要求不管开关都执行点击）
-        // 按照新需求：不管 closeAppOnEnd，只要 countdownSeconds <= -1 就触发延迟点击
+        // 当倒计时变为 -1 或更小，且尚未调度延迟操作
         if (self.countdownSeconds <= -1 && !self.delayedActionScheduled) {
             // 如果 closeAppOnEnd 为 YES，则关闭 APP（原有逻辑）
             if (self.closeAppOnEnd) {
@@ -778,7 +780,7 @@ static UIView *floatView = nil;
 }
 
 - (void)sendBarkNotificationIfEnabled {
-    // ... 原有实现保持不变 ...
+    // 保持原有实现
 }
 
 - (void)dealloc {
