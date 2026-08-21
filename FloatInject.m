@@ -21,6 +21,10 @@
 #define kCloseAppKey        @"FloatInject_close_app"
 #define kCountdownStartKey  @"FloatInject_countdown_start"
 
+// ===== 新增：点击坐标存储键 =====
+#define kClickXKey          @"FloatInject_click_x"
+#define kClickYKey          @"FloatInject_click_y"
+
 // 悬浮窗尺寸
 #define kFloatWidth    38.0
 #define kFloatHeight   50.0
@@ -30,12 +34,14 @@
 #define kDefaultCooldown     2
 #define kDefaultCountdownMin 40
 #define kDefaultCloseApp     NO
+#define kDefaultClickX       390.0
+#define kDefaultClickY       390.0
 
 static UIView *floatView = nil;
 
-// ---- 自定义设置面板 ----
+// ---- 自定义设置面板（新增坐标输入） ----
 @interface SettingsPanel : UIView <UITextFieldDelegate>
-@property (nonatomic, copy) void (^onSave)(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp);
+@property (nonatomic, copy) void (^onSave)(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp, CGFloat clickX, CGFloat clickY);
 @property (nonatomic, copy) void (^onDismiss)(void);
 @end
 
@@ -45,6 +51,9 @@ static UIView *floatView = nil;
     UITextField *_cooldownField;
     UITextField *_barkKeyField;
     UITextField *_countdownField;
+    // ===== 新增：坐标输入框 =====
+    UITextField *_clickXField;
+    UITextField *_clickYField;
     UISwitch   *_lockSwitch;
     UISwitch   *_barkSwitch;
     UISwitch   *_closeAppSwitch;
@@ -59,14 +68,16 @@ static UIView *floatView = nil;
                   barkEnabled:(BOOL)barkEnabled
                       barkKey:(NSString *)barkKey
                  countdownMin:(NSInteger)countdownMin
-                     closeApp:(BOOL)closeApp {
+                     closeApp:(BOOL)closeApp
+                      clickX:(CGFloat)clickX
+                      clickY:(CGFloat)clickY {
     if (self = [super initWithFrame:[UIScreen mainScreen].bounds]) {
         self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
         UITapGestureRecognizer *tapBg = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(cancel)];
         [self addGestureRecognizer:tapBg];
 
         CGFloat panelW = 290;
-        CGFloat panelH = 530;  // 修改为 530
+        CGFloat panelH = 580;  // 增加高度以容纳坐标输入
         _panelContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, panelW, panelH)];
         _panelContainer.center = self.center;
         _panelContainer.backgroundColor = [UIColor whiteColor];
@@ -147,6 +158,33 @@ static UIView *floatView = nil;
         _countdownField.delegate = self;
         [_panelContainer addSubview:_countdownField];
         y += 42;
+
+        // ===== 新增：点击坐标 X =====
+        UILabel *clickXLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 80, 20)];
+        clickXLabel.text = @"点击 X:";
+        clickXLabel.font = [UIFont systemFontOfSize:14];
+        [_panelContainer addSubview:clickXLabel];
+        _clickXField = [[UITextField alloc] initWithFrame:CGRectMake(110, y-2, 70, 30)];
+        _clickXField.borderStyle = UITextBorderStyleRoundedRect;
+        _clickXField.font = [UIFont systemFontOfSize:14];
+        _clickXField.keyboardType = UIKeyboardTypeDecimalPad;
+        _clickXField.text = [NSString stringWithFormat:@"%.0f", clickX];
+        _clickXField.delegate = self;
+        [_panelContainer addSubview:_clickXField];
+
+        // ===== 新增：点击坐标 Y =====
+        UILabel *clickYLabel = [[UILabel alloc] initWithFrame:CGRectMake(190, y, 80, 20)];
+        clickYLabel.text = @"Y:";
+        clickYLabel.font = [UIFont systemFontOfSize:14];
+        [_panelContainer addSubview:clickYLabel];
+        _clickYField = [[UITextField alloc] initWithFrame:CGRectMake(220, y-2, 50, 30)];
+        _clickYField.borderStyle = UITextBorderStyleRoundedRect;
+        _clickYField.font = [UIFont systemFontOfSize:14];
+        _clickYField.keyboardType = UIKeyboardTypeDecimalPad;
+        _clickYField.text = [NSString stringWithFormat:@"%.0f", clickY];
+        _clickYField.delegate = self;
+        [_panelContainer addSubview:_clickYField];
+        y += 40;
 
         // 锁定开关
         UILabel *lockLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 100, 31)];
@@ -233,7 +271,11 @@ static UIView *floatView = nil;
     NSInteger countdownMin = [_countdownField.text integerValue];
     if (countdownMin <= 0) countdownMin = kDefaultCountdownMin;
     BOOL closeApp = _closeAppSwitch.on;
-    if (self.onSave) self.onSave(text, locked, timeout, cooldown, barkEnabled, barkKey, countdownMin, closeApp);
+    CGFloat clickX = [_clickXField.text doubleValue];
+    CGFloat clickY = [_clickYField.text doubleValue];
+    if (clickX <= 0) clickX = kDefaultClickX;
+    if (clickY <= 0) clickY = kDefaultClickY;
+    if (self.onSave) self.onSave(text, locked, timeout, cooldown, barkEnabled, barkKey, countdownMin, closeApp, clickX, clickY);
 }
 
 - (void)dismiss {
@@ -284,12 +326,14 @@ static UIView *floatView = nil;
 @property (nonatomic, assign) NSInteger timeout;
 @property (nonatomic, assign) NSInteger cooldown;
 @property (nonatomic, assign) BOOL paused;
-@property (nonatomic, assign) NSInteger countdownSeconds; // 当前剩余秒数（可为负）
+@property (nonatomic, assign) NSInteger countdownSeconds;
 @property (nonatomic, assign) NSInteger countdownMin;
 @property (nonatomic, assign) BOOL closeAppOnEnd;
+@property (nonatomic, assign) CGFloat clickX;
+@property (nonatomic, assign) CGFloat clickY;
 
 @property (nonatomic, strong) NSTimer *timer;
-@property (nonatomic, assign) NSInteger elapsedSeconds;   // 正常模式正计时
+@property (nonatomic, assign) NSInteger elapsedSeconds;
 @property (nonatomic, assign) BOOL alertPlayed;
 @property (nonatomic, assign) NSTimeInterval lastTapTime;
 @end
@@ -297,7 +341,8 @@ static UIView *floatView = nil;
 @implementation FloatView
 
 - (instancetype)initWithFrame:(CGRect)frame {
-    if (self = [super initWithFrame:frame]) {
+    self = [super initWithFrame:frame];
+    if (self) {
         self.backgroundColor = [UIColor whiteColor];
         self.layer.cornerRadius = 8;
         self.layer.shadowColor = [UIColor blackColor].CGColor;
@@ -305,7 +350,6 @@ static UIView *floatView = nil;
         self.layer.shadowOpacity = 0.3;
         self.layer.shadowRadius = 4;
 
-        // 适配新尺寸（38x50）
         _titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(4, 4, kFloatWidth-8, 14)];
         _titleLabel.textAlignment = NSTextAlignmentCenter;
         _titleLabel.font = [UIFont boldSystemFontOfSize:14];
@@ -335,7 +379,6 @@ static UIView *floatView = nil;
         UITapGestureRecognizer *doubleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleDoubleTap:)];
         doubleTap.numberOfTapsRequired = 2;
         [self addGestureRecognizer:doubleTap];
-
         [tap requireGestureRecognizerToFail:doubleTap];
 
         UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
@@ -361,6 +404,10 @@ static UIView *floatView = nil;
     self.countdownMin = [def integerForKey:kCountdownKey];
     if (self.countdownMin <= 0) self.countdownMin = kDefaultCountdownMin;
     self.closeAppOnEnd = [def boolForKey:kCloseAppKey];
+    self.clickX = [def doubleForKey:kClickXKey];
+    if (self.clickX <= 0) self.clickX = kDefaultClickX;
+    self.clickY = [def doubleForKey:kClickYKey];
+    if (self.clickY <= 0) self.clickY = kDefaultClickY;
 
     for (UIGestureRecognizer *gr in self.gestureRecognizers) {
         if ([gr isKindOfClass:[UIPanGestureRecognizer class]]) {
@@ -398,7 +445,6 @@ static UIView *floatView = nil;
     self.frame = CGRectMake(x, y, kFloatWidth, kFloatHeight);
     [self updateLabels];
 
-    // 计时器状态恢复
     if (self.paused) {
         NSTimeInterval startTime = [def doubleForKey:kCountdownStartKey];
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
@@ -411,13 +457,10 @@ static UIView *floatView = nil;
         NSInteger remaining = totalSeconds - elapsed;
         self.countdownSeconds = remaining;
         [self updateTimerLabel];
-
-        // 仅在 remaining == 0 且开关打开时关闭
         if (remaining == 0 && self.closeAppOnEnd) {
             [self stopTimer];
             exit(0);
         }
-        // remaining < 0 或 > 0 均不关闭，继续倒计时
         [self startTimer];
         [self updateIdleTimerDisabled];
     } else {
@@ -465,21 +508,59 @@ static UIView *floatView = nil;
 
 - (void)handleTap:(UITapGestureRecognizer *)tap {
     if (self.paused) return;
-
     NSTimeInterval now = CACurrentMediaTime();
     if (self.lastTapTime > 0 && (now - self.lastTapTime) < self.cooldown) {
         return;
     }
     self.lastTapTime = now;
-
     if (self.items.count > 0) {
         self.currentIndex = (self.currentIndex + 1) % self.items.count;
         [self updateLabels];
         [[NSUserDefaults standardUserDefaults] setInteger:self.currentIndex forKey:kIndexKey];
     }
-
     [self resetTimer];
     [self sendBarkNotificationIfEnabled];
+}
+
+// ===== 新增：点击反馈圈圈 =====
+- (void)showTapMarkerAtPoint:(CGPoint)point {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindow *targetWindow = nil;
+        for (UIWindow *w in [UIApplication sharedApplication].windows) {
+            if ([NSStringFromClass([w class]) isEqualToString:@"FloatInject_FloatView"]) {
+                // 不添加到自身，而是添加到目标窗口或 keyWindow
+                continue;
+            }
+            if (w.isKeyWindow) {
+                targetWindow = w;
+                break;
+            }
+        }
+        if (!targetWindow) {
+            targetWindow = [UIApplication sharedApplication].keyWindow;
+        }
+        if (!targetWindow) return;
+        
+        UIView *oldMarker = [targetWindow viewWithTag:9999];
+        if (oldMarker) [oldMarker removeFromSuperview];
+        
+        UIView *marker = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
+        marker.center = point;
+        marker.backgroundColor = [UIColor colorWithRed:1.0 green:0.0 blue:0.0 alpha:0.9];
+        marker.layer.cornerRadius = 15;
+        marker.layer.borderWidth = 3;
+        marker.layer.borderColor = [UIColor yellowColor].CGColor;
+        marker.userInteractionEnabled = NO;
+        marker.tag = 9999;
+        [targetWindow addSubview:marker];
+        NSLog(@"[FloatInject] 🔴 Marker at (%.0f,%.0f)", point.x, point.y);
+        
+        [UIView animateWithDuration:0.5 delay:0.5 options:UIViewAnimationOptionCurveEaseOut animations:^{
+            marker.alpha = 0.0;
+        } completion:^(BOOL finished) {
+            [marker removeFromSuperview];
+        }];
+    });
 }
 
 // ===== 新增：模拟触摸方法 =====
@@ -516,8 +597,7 @@ static UIView *floatView = nil;
     }
 }
 
-
-// ===== 修改：双击暂停时发送点击 =====
+// ===== 双击：进入暂停并发送点击 =====
 - (void)handleDoubleTap:(UITapGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateEnded) return;
     self.paused = !self.paused;
@@ -525,14 +605,12 @@ static UIView *floatView = nil;
     [self updateLabels];
 
     if (self.paused) {
-        // 进入暂停模式：重置倒计时并开始计时
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         [[NSUserDefaults standardUserDefaults] setDouble:now forKey:kCountdownStartKey];
         [self resetCountdown];
         
-        // ===== 新增：发送一次点击到 (390,390) =====
+        // ===== 发送点击 =====
         UIWindow *targetWindow = nil;
-        // 优先查找 windowLevel == 1999 的窗口（老贝贝所在窗口）
         for (UIWindow *w in [UIApplication sharedApplication].windows) {
             if (w.windowLevel == 1999.0) {
                 targetWindow = w;
@@ -540,11 +618,12 @@ static UIView *floatView = nil;
             }
         }
         if (!targetWindow) {
-            // 如果没有找到，使用 keyWindow
             targetWindow = [UIApplication sharedApplication].keyWindow;
         }
         if (targetWindow) {
-            [self sendTapAtPoint:CGPointMake(390, 390) inWindow:targetWindow withDuration:0.2];
+            CGPoint clickPoint = CGPointMake(self.clickX, self.clickY);
+            [self showTapMarkerAtPoint:clickPoint];
+            [self sendTapAtPoint:clickPoint inWindow:targetWindow withDuration:0.2];
         } else {
             NSLog(@"[FloatInject] ⚠️ No window found for tap");
         }
@@ -554,39 +633,6 @@ static UIView *floatView = nil;
     }
     [self updateIdleTimerDisabled];
     [self sendBarkNotificationIfEnabled];
-}
-
-- (void)sendBarkNotificationIfEnabled {
-    NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
-    BOOL enabled = [def boolForKey:kBarkEnabledKey];
-    if (!enabled) return;
-
-    NSString *barkKey = [def objectForKey:kBarkKeyKey];
-    if (!barkKey || barkKey.length == 0) return;
-
-    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-    formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
-    NSString *timeStr = [formatter stringFromDate:[NSDate date]];
-
-    NSString *currentText;
-    if (self.paused) {
-        currentText = @"⏸️ 暂停";
-    } else if (self.items.count > 0) {
-        NSDictionary *item = self.items[self.currentIndex];
-        currentText = [NSString stringWithFormat:@"%@ %@", item[@"title"], item[@"content"]];
-    } else {
-        currentText = @"";
-    }
-
-    NSString *pushContent = [NSString stringWithFormat:@"%@ %@", timeStr, currentText];
-    NSString *encodedContent = [pushContent stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
-    NSString *urlString = [NSString stringWithFormat:@"https://api.day.app/%@/%@?group=YDB", barkKey, encodedContent];
-    NSURL *url = [NSURL URLWithString:urlString];
-    if (!url) return;
-
-    NSURLSession *session = [NSURLSession sharedSession];
-    NSURLSessionDataTask *task = [session dataTaskWithURL:url completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {}];
-    [task resume];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
@@ -611,7 +657,6 @@ static UIView *floatView = nil;
 
 - (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateBegan) return;
-
     if (@available(iOS 10.0, *)) {
         UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
         [gen impactOccurred];
@@ -627,6 +672,8 @@ static UIView *floatView = nil;
     NSString *currentBarkKey = [def objectForKey:kBarkKeyKey] ?: @"";
     NSInteger currentCountdownMin = self.countdownMin;
     BOOL currentCloseApp = self.closeAppOnEnd;
+    CGFloat currentClickX = self.clickX;
+    CGFloat currentClickY = self.clickY;
 
     __weak typeof(self) weakSelf = self;
     UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
@@ -640,8 +687,10 @@ static UIView *floatView = nil;
                                                     barkEnabled:currentBarkEnabled
                                                         barkKey:currentBarkKey
                                                    countdownMin:currentCountdownMin
-                                                       closeApp:currentCloseApp];
-    panel.onSave = ^(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp) {
+                                                       closeApp:currentCloseApp
+                                                        clickX:currentClickX
+                                                        clickY:currentClickY];
+    panel.onSave = ^(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp, CGFloat clickX, CGFloat clickY) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
         NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
@@ -653,6 +702,8 @@ static UIView *floatView = nil;
         [def setObject:barkKey forKey:kBarkKeyKey];
         [def setInteger:countdownMin forKey:kCountdownKey];
         [def setBool:closeApp forKey:kCloseAppKey];
+        [def setDouble:clickX forKey:kClickXKey];
+        [def setDouble:clickY forKey:kClickYKey];
         [def synchronize];
         [strongSelf reloadFromDefaults];
     };
@@ -665,7 +716,6 @@ static UIView *floatView = nil;
     }];
 }
 
-// ---- 计时器管理 ----
 - (void)resetTimer {
     [self stopTimer];
     self.elapsedSeconds = 0;
@@ -706,17 +756,13 @@ static UIView *floatView = nil;
     if (self.paused) {
         self.countdownSeconds--;
         [self updateTimerLabel];
-
-        // 仅在倒计时恰好变为 0 时关闭
         if (self.countdownSeconds == 0 && self.closeAppOnEnd) {
             [self stopTimer];
             exit(0);
         }
-        // 小于 0 不关闭，继续倒计时
     } else {
         self.elapsedSeconds++;
         [self updateTimerLabel];
-
         if (self.elapsedSeconds >= self.timeout) {
             if (!self.alertPlayed) {
                 self.alertPlayed = YES;
@@ -725,6 +771,34 @@ static UIView *floatView = nil;
             }
         }
     }
+}
+
+- (void)sendBarkNotificationIfEnabled {
+    NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
+    BOOL enabled = [def boolForKey:kBarkEnabledKey];
+    if (!enabled) return;
+    NSString *barkKey = [def objectForKey:kBarkKeyKey];
+    if (!barkKey || barkKey.length == 0) return;
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    NSString *timeStr = [formatter stringFromDate:[NSDate date]];
+    NSString *currentText;
+    if (self.paused) {
+        currentText = @"⏸️ 暂停";
+    } else if (self.items.count > 0) {
+        NSDictionary *item = self.items[self.currentIndex];
+        currentText = [NSString stringWithFormat:@"%@ %@", item[@"title"], item[@"content"]];
+    } else {
+        currentText = @"";
+    }
+    NSString *pushContent = [NSString stringWithFormat:@"%@ %@", timeStr, currentText];
+    NSString *encodedContent = [pushContent stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
+    NSString *urlString = [NSString stringWithFormat:@"https://api.day.app/%@/%@?group=YDB", barkKey, encodedContent];
+    NSURL *url = [NSURL URLWithString:urlString];
+    if (!url) return;
+    NSURLSession *session = [NSURLSession sharedSession];
+    NSURLSessionDataTask *task = [session dataTaskWithURL:url completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {}];
+    [task resume];
 }
 
 - (void)dealloc {
@@ -738,7 +812,6 @@ __attribute__((constructor))
 static void injectFloatingView(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (floatView) return;
-
         NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
         CGFloat x = [def doubleForKey:kPosXKey];
         CGFloat y = [def doubleForKey:kPosYKey];
@@ -746,10 +819,8 @@ static void injectFloatingView(void) {
             x = ([UIScreen mainScreen].bounds.size.width - kFloatWidth) / 2;
             y = ([UIScreen mainScreen].bounds.size.height - kFloatHeight) / 2;
         }
-
         FloatView *fv = [[FloatView alloc] initWithFrame:CGRectMake(x, y, kFloatWidth, kFloatHeight)];
         floatView = fv;
-
         void (^addToWindow)(void) = ^{
             UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
             if (keyWindow) {
@@ -760,7 +831,6 @@ static void injectFloatingView(void) {
                 });
             }
         };
-
         if ([NSThread isMainThread]) {
             addToWindow();
         } else {
