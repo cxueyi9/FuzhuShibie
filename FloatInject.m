@@ -1,7 +1,7 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioServices.h>
 
-// 导入触摸模拟所需头文件
+// ===== 导入触摸模拟所需头文件 =====
 #import "UITouch-KIFAdditions.h"
 #import "UIEvent+KIFAdditions.h"
 #import "UIApplication-KIFAdditions.h"
@@ -86,6 +86,7 @@ static UIView *floatView = nil;
         _panelContainer.clipsToBounds = YES;
         [self addSubview:_panelContainer];
 
+        // 标题
         UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(20, 16, panelW-40, 24)];
         title.text = @"悬浮窗设置";
         title.font = [UIFont boldSystemFontOfSize:17];
@@ -94,6 +95,7 @@ static UIView *floatView = nil;
 
         CGFloat y = 48;
 
+        // 文字数组
         UILabel *itemsHint = [[UILabel alloc] initWithFrame:CGRectMake(20, y, panelW-40, 14)];
         itemsHint.text = @"文字数组 (标题,内容;…)";
         itemsHint.font = [UIFont systemFontOfSize:12];
@@ -110,6 +112,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_itemsField];
         y += 42;
 
+        // 超时时间
         UILabel *timeoutLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, panelW-40, 20)];
         timeoutLabel.text = @"超时提醒（秒）";
         timeoutLabel.font = [UIFont systemFontOfSize:14];
@@ -125,6 +128,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_timeoutField];
         y += 42;
 
+        // 冷却时间
         UILabel *cooldownLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, panelW-40, 20)];
         cooldownLabel.text = @"冷却时间（秒）";
         cooldownLabel.font = [UIFont systemFontOfSize:14];
@@ -140,6 +144,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_cooldownField];
         y += 42;
 
+        // 倒计时分钟数
         UILabel *countdownLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, panelW-40, 20)];
         countdownLabel.text = @"暂停倒计时（分钟）";
         countdownLabel.font = [UIFont systemFontOfSize:14];
@@ -155,6 +160,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_countdownField];
         y += 42;
 
+        // 点击坐标 X
         UILabel *clickXLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 80, 20)];
         clickXLabel.text = @"点击 X:";
         clickXLabel.font = [UIFont systemFontOfSize:14];
@@ -167,6 +173,7 @@ static UIView *floatView = nil;
         _clickXField.delegate = self;
         [_panelContainer addSubview:_clickXField];
 
+        // 点击坐标 Y
         UILabel *clickYLabel = [[UILabel alloc] initWithFrame:CGRectMake(190, y, 80, 20)];
         clickYLabel.text = @"Y:";
         clickYLabel.font = [UIFont systemFontOfSize:14];
@@ -180,6 +187,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_clickYField];
         y += 40;
 
+        // 延迟秒数
         UILabel *delayLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 100, 20)];
         delayLabel.text = @"延迟（秒）:";
         delayLabel.font = [UIFont systemFontOfSize:14];
@@ -193,6 +201,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_delayField];
         y += 40;
 
+        // 锁定开关
         UILabel *lockLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 100, 31)];
         lockLabel.text = @"锁定位置";
         lockLabel.font = [UIFont systemFontOfSize:14];
@@ -203,6 +212,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_lockSwitch];
         y += 40;
 
+        // Bark 推送开关
         UILabel *barkSwitchLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 100, 31)];
         barkSwitchLabel.text = @"Bark推送";
         barkSwitchLabel.font = [UIFont systemFontOfSize:14];
@@ -213,6 +223,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_barkSwitch];
         y += 40;
 
+        // Bark 密钥输入框
         UILabel *barkKeyLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, panelW-40, 18)];
         barkKeyLabel.text = @"Bark 密钥";
         barkKeyLabel.font = [UIFont systemFontOfSize:12];
@@ -229,8 +240,9 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_barkKeyField];
         y += 42;
 
+        // 倒计时结束关闭App开关
         UILabel *closeAppLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 180, 31)];
-        closeAppLabel.text = @"倒计时归零关闭App";
+        closeAppLabel.text = @"倒计时结束关闭App";
         closeAppLabel.font = [UIFont systemFontOfSize:14];
         [_panelContainer addSubview:closeAppLabel];
 
@@ -239,6 +251,7 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_closeAppSwitch];
         y += 40;
 
+        // 保存按钮
         UIButton *saveBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         saveBtn.frame = CGRectMake(20, y, panelW-40, 40);
         [saveBtn setTitle:@"保存" forState:UIControlStateNormal];
@@ -248,6 +261,7 @@ static UIView *floatView = nil;
         [saveBtn addTarget:self action:@selector(save) forControlEvents:UIControlEventTouchUpInside];
         [_panelContainer addSubview:saveBtn];
 
+        // 键盘通知
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShow:) name:UIKeyboardWillShowNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHide:) name:UIKeyboardWillHideNotification object:nil];
     }
@@ -335,6 +349,7 @@ static UIView *floatView = nil;
 @property (nonatomic, assign) CGFloat clickX;
 @property (nonatomic, assign) CGFloat clickY;
 @property (nonatomic, assign) CGFloat delaySeconds;
+
 @property (nonatomic, strong) NSTimer *timer;
 @property (nonatomic, assign) NSInteger elapsedSeconds;
 @property (nonatomic, assign) BOOL alertPlayed;
@@ -464,15 +479,17 @@ static UIView *floatView = nil;
         NSInteger remaining = totalSeconds - elapsed;
         self.countdownSeconds = remaining;
         [self updateTimerLabel];
-        // 如果倒计时归零（恰好0）且 closeAppOnEnd 为 YES，关闭 App
+        // 如果倒计时小于-1，调度延迟点击（无论closeAppOnEnd）
+        if (self.countdownSeconds < -1) {
+            if (!self.delayedActionScheduled) {
+                self.delayedActionScheduled = YES;
+                [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
+            }
+        }
+        // 如果倒计时 == 0 且 closeAppOnEnd 为 YES，关闭 APP
         if (self.countdownSeconds == 0 && self.closeAppOnEnd) {
             [self stopTimer];
             exit(0);
-        }
-        // 如果倒计时小于等于 -1，且尚未调度延迟操作，则调度
-        if (self.countdownSeconds <= -1 && !self.delayedActionScheduled) {
-            self.delayedActionScheduled = YES;
-            [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
         }
         [self startTimer];
         [self updateIdleTimerDisabled];
@@ -535,15 +552,25 @@ static UIView *floatView = nil;
     [self sendBarkNotificationIfEnabled];
 }
 
-// ---- 显示点击圈圈（提升层级） ----
+// ===== 点击反馈圈圈（提升层级） =====
 - (void)showTapMarkerAtPoint:(CGPoint)point {
     dispatch_async(dispatch_get_main_queue(), ^{
-        // 创建一个新的 UIWindow 来显示圈圈，确保在最上层
-        UIWindow *markerWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        markerWindow.windowLevel = UIWindowLevelStatusBar + 1; // 高于状态栏
-        markerWindow.backgroundColor = [UIColor clearColor];
-        markerWindow.userInteractionEnabled = NO;
-        markerWindow.hidden = NO;
+        UIWindow *targetWindow = nil;
+        // 查找 windowLevel 最高的窗口（除我们自己的悬浮窗外）
+        UIWindow *highestWindow = nil;
+        for (UIWindow *w in [UIApplication sharedApplication].windows) {
+            if ([NSStringFromClass([w class]) isEqualToString:@"FloatView"]) continue;
+            if (w.hidden) continue;
+            if (!highestWindow || w.windowLevel > highestWindow.windowLevel) {
+                highestWindow = w;
+            }
+        }
+        targetWindow = highestWindow;
+        if (!targetWindow) targetWindow = [UIApplication sharedApplication].keyWindow;
+        if (!targetWindow) return;
+        
+        UIView *oldMarker = [targetWindow viewWithTag:9999];
+        if (oldMarker) [oldMarker removeFromSuperview];
         
         UIView *marker = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
         marker.center = point;
@@ -553,20 +580,20 @@ static UIView *floatView = nil;
         marker.layer.borderColor = [UIColor yellowColor].CGColor;
         marker.userInteractionEnabled = NO;
         marker.tag = 9999;
-        [markerWindow addSubview:marker];
-        NSLog(@"[FloatInject] 🔴 Marker at (%.0f,%.0f) on top window", point.x, point.y);
+        [targetWindow addSubview:marker];
+        // 确保在最上层
+        [targetWindow bringSubviewToFront:marker];
+        NSLog(@"[FloatInject] 🔴 Marker at (%.0f,%.0f)", point.x, point.y);
         
         [UIView animateWithDuration:0.5 delay:0.5 options:UIViewAnimationOptionCurveEaseOut animations:^{
             marker.alpha = 0.0;
         } completion:^(BOOL finished) {
             [marker removeFromSuperview];
-            markerWindow.hidden = YES;
-            markerWindow = nil;
         }];
     });
 }
 
-// ---- 模拟触摸 ----
+// ===== 发送触摸事件 =====
 - (void)sendTapAtPoint:(CGPoint)screenPoint inWindow:(UIWindow *)window withDuration:(NSTimeInterval)duration {
     if (!window) {
         NSLog(@"[FloatInject] ❌ Window is nil");
@@ -600,16 +627,10 @@ static UIView *floatView = nil;
     }
 }
 
-// ---- 延迟执行自动点击 ----
+// ===== 执行延迟点击并退出暂停 =====
 - (void)performDelayedClick {
-    if (!self.paused) return; // 如果已经退出暂停，则不执行
-    NSLog(@"[FloatInject] ⏰ Performing delayed click after %.1f seconds", self.delaySeconds);
-    
-    // 显示圈圈
-    CGPoint clickPoint = CGPointMake(self.clickX, self.clickY);
-    [self showTapMarkerAtPoint:clickPoint];
-    
-    // 查找目标窗口
+    NSLog(@"[FloatInject] ⏰ Executing delayed click after %.1f seconds", self.delaySeconds);
+    // 发送点击
     UIWindow *targetWindow = nil;
     for (UIWindow *w in [UIApplication sharedApplication].windows) {
         if (w.windowLevel == 1999.0) {
@@ -621,21 +642,28 @@ static UIView *floatView = nil;
         targetWindow = [UIApplication sharedApplication].keyWindow;
     }
     if (targetWindow) {
+        CGPoint clickPoint = CGPointMake(self.clickX, self.clickY);
+        [self showTapMarkerAtPoint:clickPoint];
         [self sendTapAtPoint:clickPoint inWindow:targetWindow withDuration:0.2];
+    } else {
+        NSLog(@"[FloatInject] ⚠️ No window found for tap");
     }
     
     // 退出暂停模式
     self.paused = NO;
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:kPausedKey];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCountdownStartKey];
+    [self stopTimer];
+    self.elapsedSeconds = 0;
+    self.alertPlayed = NO;
     [self updateLabels];
-    [self resetTimer];
-    [self updateIdleTimerDisabled];
-    self.delayedActionScheduled = NO;
+    [self updateTimerLabel];
+    [UIApplication sharedApplication].idleTimerDisabled = NO;
     [self sendBarkNotificationIfEnabled];
+    NSLog(@"[FloatInject] ✅ Resumed from pause after delayed click");
 }
 
-// ---- 双击暂停 ----
+// ===== 双击 =====
 - (void)handleDoubleTap:(UITapGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateEnded) return;
     self.paused = !self.paused;
@@ -646,18 +674,14 @@ static UIView *floatView = nil;
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         [[NSUserDefaults standardUserDefaults] setDouble:now forKey:kCountdownStartKey];
         [self resetCountdown];
-        // 如果进入暂停时倒计时已经 <= -1，则直接调度（但通常不会，因为 resetCountdown 会从0开始）
     } else {
         [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCountdownStartKey];
         [self resetTimer];
-        self.delayedActionScheduled = NO;
-        [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(performDelayedClick) object:nil];
     }
     [self updateIdleTimerDisabled];
     [self sendBarkNotificationIfEnabled];
 }
 
-// ---- 其他方法保持不变 ----
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
     if (self.locked) return;
     CGPoint translation = [pan translationInView:self.superview];
@@ -782,15 +806,15 @@ static UIView *floatView = nil;
     if (self.paused) {
         self.countdownSeconds--;
         [self updateTimerLabel];
-        // 如果倒计时归零（恰好0）且 closeAppOnEnd 为 YES，关闭 App
+        // 如果倒计时小于-1 且尚未调度延迟操作，则调度
+        if (self.countdownSeconds < -1 && !self.delayedActionScheduled) {
+            self.delayedActionScheduled = YES;
+            [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
+        }
+        // 如果倒计时等于0 且 closeAppOnEnd 为 YES，关闭 APP
         if (self.countdownSeconds == 0 && self.closeAppOnEnd) {
             [self stopTimer];
             exit(0);
-        }
-        // 如果倒计时小于等于 -1，且尚未调度延迟操作，则调度
-        if (self.countdownSeconds <= -1 && !self.delayedActionScheduled) {
-            self.delayedActionScheduled = YES;
-            [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
         }
     } else {
         self.elapsedSeconds++;
@@ -835,7 +859,7 @@ static UIView *floatView = nil;
 
 - (void)dealloc {
     [self stopTimer];
-    [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(performDelayedClick) object:nil];
 }
 
 @end
