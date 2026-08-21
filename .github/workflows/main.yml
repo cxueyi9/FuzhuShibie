@@ -20,11 +20,15 @@ jobs:
             -arch arm64 \
             -o FloatInject.dylib \
             FloatInject.m \
+            UITouch-KIFAdditions.m \
+            UIEvent+KIFAdditions.m \
+            UIApplication-KIFAdditions.m \
+            IOHIDEvent+KIF.m \
             -framework UIKit \
-            -framework CoreGraphics \
             -framework Foundation \
+            -framework CoreGraphics \
+            -framework IOKit \
             -framework AudioToolbox \
-            -framework QuartzCore \
             -fobjc-arc \
             -miphoneos-version-min=12.0
 
