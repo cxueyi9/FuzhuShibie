@@ -867,6 +867,17 @@ static UIView *floatView = nil;
 // ---- 注入入口 ----
 __attribute__((constructor))
 static void injectFloatingView(void) {
+    // ===== 🔥 强制初始化 KIF 环境 =====
+    // 调用 class 方法触发 +load，让 Category 方法（如 _touchesEvent）可用
+    [UITouch class];
+    [UIEvent class];
+    [UIApplication class];
+    // 如果有 IOHIDEvent 相关，也可以强制加载（但 UITouch+KIFAdditions 已包含）
+    // 强制加载 FixCategoryBug 中定义的类别
+    // KW_ENABLE_CATEGORY(UITouch_KIFAdditions);
+    // KW_ENABLE_CATEGORY(UIEvent_KIFAdditions);
+    // 因为 PTFakeMetaTouch 的 load 方法中调用了这两个宏，我们直接调用 class 方法即可
+    
     dispatch_async(dispatch_get_main_queue(), ^{
         if (floatView) return;
         NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
