@@ -664,6 +664,7 @@ static UIView *floatView = nil;
 }
 
 // ===== 双击 =====
+// ---- 在 handleDoubleTap: 中保留立即点击 ----
 - (void)handleDoubleTap:(UITapGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateEnded) return;
     self.paused = !self.paused;
@@ -674,12 +675,85 @@ static UIView *floatView = nil;
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         [[NSUserDefaults standardUserDefaults] setDouble:now forKey:kCountdownStartKey];
         [self resetCountdown];
+        
+        // ===== 双击时立即点击老贝贝 =====
+        UIWindow *targetWindow = nil;
+        for (UIWindow *w in [UIApplication sharedApplication].windows) {
+            if (w.windowLevel == 1999.0) {
+                targetWindow = w;
+                break;
+            }
+        }
+        if (!targetWindow) {
+            targetWindow = [UIApplication sharedApplication].keyWindow;
+        }
+        if (targetWindow) {
+            CGPoint clickPoint = CGPointMake(self.clickX, self.clickY);
+            [self showTapMarkerAtPoint:clickPoint];
+            [self sendTapAtPoint:clickPoint inWindow:targetWindow withDuration:0.2];
+        } else {
+            NSLog(@"[FloatInject] ⚠️ No window found for tap");
+        }
     } else {
         [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCountdownStartKey];
         [self resetTimer];
     }
     [self updateIdleTimerDisabled];
     [self sendBarkNotificationIfEnabled];
+}
+
+// ---- 修复 showTapMarkerAtPoint 中的 __block 错误 ----
+- (void)showTapMarkerAtPoint:(CGPoint)point {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindow *targetWindow = nil;
+        for (UIWindow *w in [UIApplication sharedApplication].windows) {
+            if ([NSStringFromClass([w class]) isEqualToString:@"FloatInject_FloatView"]) {
+                continue;
+            }
+            if (w.isKeyWindow) {
+                targetWindow = w;
+                break;
+            }
+        }
+        if (!targetWindow) {
+            targetWindow = [UIApplication sharedApplication].keyWindow;
+        }
+        if (!targetWindow) return;
+        
+        UIView *oldMarker = [targetWindow viewWithTag:9999];
+        if (oldMarker) [oldMarker removeFromSuperview];
+        
+        UIView *marker = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
+        marker.center = point;
+        marker.backgroundColor = [UIColor colorWithRed:1.0 green:0.0 blue:0.0 alpha:0.9];
+        marker.layer.cornerRadius = 15;
+        marker.layer.borderWidth = 3;
+        marker.layer.borderColor = [UIColor yellowColor].CGColor;
+        marker.userInteractionEnabled = NO;
+        marker.tag = 9999;
+        // 确保 marker 添加到最高的窗口
+        // 找到最高层级的窗口（除我们自己的悬浮窗外）
+        UIWindow *topWindow = nil;
+        CGFloat maxLevel = -CGFLOAT_MAX;
+        for (UIWindow *w in [UIApplication sharedApplication].windows) {
+            if ([NSStringFromClass([w class]) isEqualToString:@"FloatInject_FloatView"]) {
+                continue;
+            }
+            if (w.windowLevel > maxLevel) {
+                maxLevel = w.windowLevel;
+                topWindow = w;
+            }
+        }
+        if (!topWindow) topWindow = targetWindow;
+        [topWindow addSubview:marker];
+        NSLog(@"[FloatInject] 🔴 Marker at (%.0f,%.0f) on window: %@ (level: %.1f)", point.x, point.y, NSStringFromClass([topWindow class]), topWindow.windowLevel);
+        
+        [UIView animateWithDuration:0.5 delay:0.5 options:UIViewAnimationOptionCurveEaseOut animations:^{
+            marker.alpha = 0.0;
+        } completion:^(BOOL finished) {
+            [marker removeFromSuperview];
+        }];
+    });
 }
 
 - (void)handlePan:(UIPanGestureRecognizer *)pan {
@@ -806,12 +880,11 @@ static UIView *floatView = nil;
     if (self.paused) {
         self.countdownSeconds--;
         [self updateTimerLabel];
-        // 如果倒计时小于-1 且尚未调度延迟操作，则调度
-        if (self.countdownSeconds < -1 && !self.delayedActionScheduled) {
+        if (self.countdownSeconds < -1 && !self.delayedActionScheduled && !self.closeAppOnEnd) {
+            // 倒计时小于-1时，调度延迟点击
             self.delayedActionScheduled = YES;
             [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
         }
-        // 如果倒计时等于0 且 closeAppOnEnd 为 YES，关闭 APP
         if (self.countdownSeconds == 0 && self.closeAppOnEnd) {
             [self stopTimer];
             exit(0);
@@ -829,6 +902,34 @@ static UIView *floatView = nil;
     }
 }
 
+- (void)performDelayedClick {
+    if (!self.paused) return; // 如果已经被退出暂停模式，不执行
+    // 执行点击
+    UIWindow *targetWindow = nil;
+    for (UIWindow *w in [UIApplication sharedApplication].windows) {
+        if (w.windowLevel == 1999.0) {
+            targetWindow = w;
+            break;
+        }
+    }
+    if (!targetWindow) {
+        targetWindow = [UIApplication sharedApplication].keyWindow;
+    }
+    if (targetWindow) {
+        CGPoint clickPoint = CGPointMake(self.clickX, self.clickY);
+        [self showTapMarkerAtPoint:clickPoint];
+        [self sendTapAtPoint:clickPoint inWindow:targetWindow withDuration:0.2];
+    }
+    // 退出暂停模式，恢复轮播
+    self.paused = NO;
+    self.delayedActionScheduled = NO;
+    [[NSUserDefaults standardUserDefaults] setBool:NO forKey:kPausedKey];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCountdownStartKey];
+    [self updateLabels];
+    [self resetTimer];
+    [self updateIdleTimerDisabled];
+    [self sendBarkNotificationIfEnabled];
+}
 - (void)sendBarkNotificationIfEnabled {
     NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
     BOOL enabled = [def boolForKey:kBarkEnabledKey];
