@@ -29,6 +29,7 @@ jobs:
             -framework CoreGraphics \
             -framework IOKit \
             -framework AudioToolbox \
+            -framework QuartzCore \
             -fobjc-arc \
             -miphoneos-version-min=12.0
 
