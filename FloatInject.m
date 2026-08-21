@@ -820,7 +820,7 @@ static UIView *floatView = nil;
             }
         }
     }
-}
+
 
 - (void)sendBarkNotificationIfEnabled {
     NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
