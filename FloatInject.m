@@ -414,6 +414,14 @@ static UIView *floatView = nil;
     return self;
 }
 
+- (void)updateIdleTimerDisabled {
+    // 只有在暂停模式且 closeAppOnEnd 为 YES 时，才阻止屏幕锁屏
+    BOOL shouldDisableIdle = (self.paused && self.closeAppOnEnd);
+    [UIApplication sharedApplication].idleTimerDisabled = shouldDisableIdle;
+    NSLog(@"[FloatInject] 🛑 IdleTimerDisabled: %@", shouldDisableIdle ? @"YES" : @"NO");
+}
+
+
 - (void)reloadFromDefaults {
     NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
     self.locked = [def boolForKey:kLockedKey];
@@ -468,7 +476,7 @@ static UIView *floatView = nil;
     }
     self.frame = CGRectMake(x, y, kFloatWidth, kFloatHeight);
     [self updateLabels];
-
+	[self updateIdleTimerDisabled];
     if (self.paused) {
         NSTimeInterval startTime = [def doubleForKey:kCountdownStartKey];
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
@@ -670,7 +678,7 @@ static UIView *floatView = nil;
     self.paused = !self.paused;
     [[NSUserDefaults standardUserDefaults] setBool:self.paused forKey:kPausedKey];
     [self updateLabels];
-
+	[self updateIdleTimerDisabled];
     if (self.paused) {
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         [[NSUserDefaults standardUserDefaults] setDouble:now forKey:kCountdownStartKey];
@@ -807,10 +815,18 @@ static UIView *floatView = nil;
     if (self.paused) {
         self.countdownSeconds--;
         [self updateTimerLabel];
-        // 1. 当倒计时变为 0 时，若 closeAppOnEnd == YES，则关闭 APP
+        // 1. 当倒计时变为 0 时，若 closeAppOnEnd == YES，则关闭 APP（先返回桌面再退出）
         if (self.countdownSeconds == 0 && self.closeAppOnEnd) {
             [self stopTimer];
-            exit(0);
+            // 先返回桌面（调用 suspend）
+            [[UIApplication sharedApplication] performSelector:@selector(suspend)];
+            // 延迟 500ms 后退出，确保回到桌面
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                exit(0);
+            });
+            // 注意：不能直接 return，因为后面还有代码，但我们要避免继续执行 timerTick
+            // 所以直接 return 防止后续操作
+            return;
         }
         // 2. 当倒计时变为 -1 时，无论开关状态，调度延迟点击
         if (self.countdownSeconds == -1 && !self.delayedActionScheduled) {
