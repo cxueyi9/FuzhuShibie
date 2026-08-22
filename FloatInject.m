@@ -24,6 +24,7 @@
 #define kClickXKey          @"FloatInject_click_x"
 #define kClickYKey          @"FloatInject_click_y"
 #define kDelayKey           @"FloatInject_delay"
+#define kShortcutKey        @"FloatInject_shortcut"
 
 // 悬浮窗尺寸
 #define kFloatWidth    38.0
@@ -40,9 +41,9 @@
 
 static UIView *floatView = nil;
 
-// ---- 自定义设置面板 ----
+// ---- 设置面板 ----
 @interface SettingsPanel : UIView <UITextFieldDelegate>
-@property (nonatomic, copy) void (^onSave)(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp, CGFloat clickX, CGFloat clickY, CGFloat delay);
+@property (nonatomic, copy) void (^onSave)(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp, CGFloat clickX, CGFloat clickY, CGFloat delay, NSString *shortcut);
 @property (nonatomic, copy) void (^onDismiss)(void);
 @end
 
@@ -55,6 +56,7 @@ static UIView *floatView = nil;
     UITextField *_clickXField;
     UITextField *_clickYField;
     UITextField *_delayField;
+    UITextField *_shortcutField;
     UISwitch   *_lockSwitch;
     UISwitch   *_barkSwitch;
     UISwitch   *_closeAppSwitch;
@@ -72,7 +74,8 @@ static UIView *floatView = nil;
                      closeApp:(BOOL)closeApp
                       clickX:(CGFloat)clickX
                       clickY:(CGFloat)clickY
-                       delay:(CGFloat)delay {
+                       delay:(CGFloat)delay
+                     shortcut:(NSString *)shortcut {
     self = [super initWithFrame:[UIScreen mainScreen].bounds];
     if (self) {
         self.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
@@ -80,7 +83,7 @@ static UIView *floatView = nil;
         [self addGestureRecognizer:tapBg];
 
         CGFloat panelW = 290;
-        CGFloat panelH = 620;
+        CGFloat panelH = 660;
         _panelContainer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, panelW, panelH)];
         _panelContainer.center = self.center;
         _panelContainer.backgroundColor = [UIColor whiteColor];
@@ -88,7 +91,6 @@ static UIView *floatView = nil;
         _panelContainer.clipsToBounds = YES;
         [self addSubview:_panelContainer];
 
-        // 标题
         UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(20, 16, panelW-40, 24)];
         title.text = @"悬浮窗设置";
         title.font = [UIFont boldSystemFontOfSize:17];
@@ -104,7 +106,6 @@ static UIView *floatView = nil;
         itemsHint.textColor = [UIColor grayColor];
         [_panelContainer addSubview:itemsHint];
         y += 16;
-
         _itemsField = [[UITextField alloc] initWithFrame:CGRectMake(20, y, panelW-40, 34)];
         _itemsField.borderStyle = UITextBorderStyleRoundedRect;
         _itemsField.font = [UIFont systemFontOfSize:13];
@@ -120,7 +121,6 @@ static UIView *floatView = nil;
         timeoutLabel.font = [UIFont systemFontOfSize:14];
         [_panelContainer addSubview:timeoutLabel];
         y += 24;
-
         _timeoutField = [[UITextField alloc] initWithFrame:CGRectMake(20, y, panelW-40, 34)];
         _timeoutField.borderStyle = UITextBorderStyleRoundedRect;
         _timeoutField.font = [UIFont systemFontOfSize:14];
@@ -136,7 +136,6 @@ static UIView *floatView = nil;
         cooldownLabel.font = [UIFont systemFontOfSize:14];
         [_panelContainer addSubview:cooldownLabel];
         y += 24;
-
         _cooldownField = [[UITextField alloc] initWithFrame:CGRectMake(20, y, panelW-40, 34)];
         _cooldownField.borderStyle = UITextBorderStyleRoundedRect;
         _cooldownField.font = [UIFont systemFontOfSize:14];
@@ -152,7 +151,6 @@ static UIView *floatView = nil;
         countdownLabel.font = [UIFont systemFontOfSize:14];
         [_panelContainer addSubview:countdownLabel];
         y += 24;
-
         _countdownField = [[UITextField alloc] initWithFrame:CGRectMake(20, y, panelW-40, 34)];
         _countdownField.borderStyle = UITextBorderStyleRoundedRect;
         _countdownField.font = [UIFont systemFontOfSize:14];
@@ -175,7 +173,6 @@ static UIView *floatView = nil;
         _clickXField.delegate = self;
         [_panelContainer addSubview:_clickXField];
 
-        // 点击坐标 Y
         UILabel *clickYLabel = [[UILabel alloc] initWithFrame:CGRectMake(190, y, 80, 20)];
         clickYLabel.text = @"Y:";
         clickYLabel.font = [UIFont systemFontOfSize:14];
@@ -203,12 +200,26 @@ static UIView *floatView = nil;
         [_panelContainer addSubview:_delayField];
         y += 40;
 
+        // 快捷指令名称
+        UILabel *shortcutLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, panelW-40, 20)];
+        shortcutLabel.text = @"快捷指令名称:";
+        shortcutLabel.font = [UIFont systemFontOfSize:14];
+        [_panelContainer addSubview:shortcutLabel];
+        y += 24;
+        _shortcutField = [[UITextField alloc] initWithFrame:CGRectMake(20, y, panelW-40, 34)];
+        _shortcutField.borderStyle = UITextBorderStyleRoundedRect;
+        _shortcutField.font = [UIFont systemFontOfSize:14];
+        _shortcutField.text = shortcut ?: @"";
+        _shortcutField.placeholder = @"输入快捷指令名称";
+        _shortcutField.delegate = self;
+        [_panelContainer addSubview:_shortcutField];
+        y += 42;
+
         // 锁定开关
         UILabel *lockLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, y, 100, 31)];
         lockLabel.text = @"锁定位置";
         lockLabel.font = [UIFont systemFontOfSize:14];
         [_panelContainer addSubview:lockLabel];
-
         _lockSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(panelW-70, y, 51, 31)];
         _lockSwitch.on = locked;
         [_panelContainer addSubview:_lockSwitch];
@@ -219,7 +230,6 @@ static UIView *floatView = nil;
         barkSwitchLabel.text = @"Bark推送";
         barkSwitchLabel.font = [UIFont systemFontOfSize:14];
         [_panelContainer addSubview:barkSwitchLabel];
-
         _barkSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(panelW-70, y, 51, 31)];
         _barkSwitch.on = barkEnabled;
         [_panelContainer addSubview:_barkSwitch];
@@ -232,7 +242,6 @@ static UIView *floatView = nil;
         barkKeyLabel.textColor = [UIColor grayColor];
         [_panelContainer addSubview:barkKeyLabel];
         y += 20;
-
         _barkKeyField = [[UITextField alloc] initWithFrame:CGRectMake(20, y, panelW-40, 34)];
         _barkKeyField.borderStyle = UITextBorderStyleRoundedRect;
         _barkKeyField.font = [UIFont systemFontOfSize:13];
@@ -247,7 +256,6 @@ static UIView *floatView = nil;
         closeAppLabel.text = @"倒计时结束关闭App";
         closeAppLabel.font = [UIFont systemFontOfSize:14];
         [_panelContainer addSubview:closeAppLabel];
-
         _closeAppSwitch = [[UISwitch alloc] initWithFrame:CGRectMake(panelW-70, y, 51, 31)];
         _closeAppSwitch.on = closeApp;
         [_panelContainer addSubview:_closeAppSwitch];
@@ -263,7 +271,6 @@ static UIView *floatView = nil;
         [saveBtn addTarget:self action:@selector(save) forControlEvents:UIControlEventTouchUpInside];
         [_panelContainer addSubview:saveBtn];
 
-        // 键盘通知
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShow:) name:UIKeyboardWillShowNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHide:) name:UIKeyboardWillHideNotification object:nil];
     }
@@ -294,7 +301,8 @@ static UIView *floatView = nil;
     if (clickY <= 0) clickY = kDefaultClickY;
     CGFloat delay = [_delayField.text doubleValue];
     if (delay < 0) delay = kDefaultDelay;
-    if (self.onSave) self.onSave(text, locked, timeout, cooldown, barkEnabled, barkKey, countdownMin, closeApp, clickX, clickY, delay);
+    NSString *shortcut = _shortcutField.text ?: @"";
+    if (self.onSave) self.onSave(text, locked, timeout, cooldown, barkEnabled, barkKey, countdownMin, closeApp, clickX, clickY, delay, shortcut);
 }
 
 - (void)dismiss {
@@ -351,6 +359,7 @@ static UIView *floatView = nil;
 @property (nonatomic, assign) CGFloat clickX;
 @property (nonatomic, assign) CGFloat clickY;
 @property (nonatomic, assign) CGFloat delaySeconds;
+@property (nonatomic, copy) NSString *shortcutName;
 
 @property (nonatomic, strong) NSTimer *timer;
 @property (nonatomic, assign) NSInteger elapsedSeconds;
@@ -414,14 +423,6 @@ static UIView *floatView = nil;
     return self;
 }
 
-- (void)updateIdleTimerDisabled {
-    // 只有在暂停模式且 closeAppOnEnd 为 YES 时，才阻止屏幕锁屏
-    BOOL shouldDisableIdle = (self.paused && self.closeAppOnEnd);
-    [UIApplication sharedApplication].idleTimerDisabled = shouldDisableIdle;
-    NSLog(@"[FloatInject] 🛑 IdleTimerDisabled: %@", shouldDisableIdle ? @"YES" : @"NO");
-}
-
-
 - (void)reloadFromDefaults {
     NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
     self.locked = [def boolForKey:kLockedKey];
@@ -439,6 +440,7 @@ static UIView *floatView = nil;
     if (self.clickY <= 0) self.clickY = kDefaultClickY;
     self.delaySeconds = [def doubleForKey:kDelayKey];
     if (self.delaySeconds < 0) self.delaySeconds = kDefaultDelay;
+    self.shortcutName = [def objectForKey:kShortcutKey] ?: @"";
     self.delayedActionScheduled = NO;
 
     for (UIGestureRecognizer *gr in self.gestureRecognizers) {
@@ -476,7 +478,7 @@ static UIView *floatView = nil;
     }
     self.frame = CGRectMake(x, y, kFloatWidth, kFloatHeight);
     [self updateLabels];
-	[self updateIdleTimerDisabled];
+
     if (self.paused) {
         NSTimeInterval startTime = [def doubleForKey:kCountdownStartKey];
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
@@ -489,17 +491,18 @@ static UIView *floatView = nil;
         NSInteger remaining = totalSeconds - elapsed;
         self.countdownSeconds = remaining;
         [self updateTimerLabel];
-        // 如果倒计时已经为 -1 或更小，调度延迟点击
         if (self.countdownSeconds <= -1 && !self.delayedActionScheduled) {
             self.delayedActionScheduled = YES;
             [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
         }
         [self startTimer];
+        [self updateIdleTimerDisabled];
     } else {
         [self stopTimer];
         self.elapsedSeconds = 0;
         self.alertPlayed = NO;
         [self updateTimerLabel];
+        [UIApplication sharedApplication].idleTimerDisabled = NO;
     }
 }
 
@@ -533,24 +536,20 @@ static UIView *floatView = nil;
     }
 }
 
+- (void)updateIdleTimerDisabled {
+    BOOL shouldDisableIdle = (self.paused && self.closeAppOnEnd);
+    [UIApplication sharedApplication].idleTimerDisabled = shouldDisableIdle;
+    NSLog(@"[FloatInject] 🛑 IdleTimerDisabled: %@", shouldDisableIdle ? @"YES" : @"NO");
+}
+
 - (void)performMemoryCleanup {
-    // 1. 清理 URL 缓存
     [[NSURLCache sharedURLCache] removeAllCachedResponses];
-    
-    // 2. 提示系统释放 malloc 内存（释放可释放的 malloc 区域）
     malloc_zone_pressure_relief(malloc_default_zone(), 0);
-    
-    // 3. 发送内存警告通知，让系统回收内存（如 UIKit 会清理图片缓存等）
     dispatch_async(dispatch_get_main_queue(), ^{
         [[NSNotificationCenter defaultCenter] postNotificationName:UIApplicationDidReceiveMemoryWarningNotification object:nil];
     });
-    
-    // 4. 强制 drain autorelease pool
-    @autoreleasepool {
-        // 空池子，帮助释放之前的临时对象
-    }
-    
-    NSLog(@"[FloatInject] 🧹 Memory cleanup triggered at index 0");
+    @autoreleasepool {}
+    NSLog(@"[FloatInject] 🧹 Memory cleanup triggered");
 }
 
 - (void)handleTap:(UITapGestureRecognizer *)tap {
@@ -564,7 +563,6 @@ static UIView *floatView = nil;
         self.currentIndex = (self.currentIndex + 1) % self.items.count;
         [self updateLabels];
         [[NSUserDefaults standardUserDefaults] setInteger:self.currentIndex forKey:kIndexKey];
-        // 🧹 当回到第一个时触发内存清理
         if (self.currentIndex == 0) {
             [self performMemoryCleanup];
         }
@@ -664,12 +662,12 @@ static UIView *floatView = nil;
     }
     self.delayedActionScheduled = NO;
     [self performClickNow];
-    // 退出暂停模式
     self.paused = NO;
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:kPausedKey];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCountdownStartKey];
     [self resetTimer];
     [self updateLabels];
+    [self updateIdleTimerDisabled];
     NSLog(@"[FloatInject] 🔄 Exited pause mode after delayed click");
 }
 
@@ -678,15 +676,17 @@ static UIView *floatView = nil;
     self.paused = !self.paused;
     [[NSUserDefaults standardUserDefaults] setBool:self.paused forKey:kPausedKey];
     [self updateLabels];
-	[self updateIdleTimerDisabled];
+
     if (self.paused) {
         NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
         [[NSUserDefaults standardUserDefaults] setDouble:now forKey:kCountdownStartKey];
         [self resetCountdown];
         [self performClickNow];
+        [self updateIdleTimerDisabled];
     } else {
         [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCountdownStartKey];
         [self resetTimer];
+        [UIApplication sharedApplication].idleTimerDisabled = NO;
     }
     [self sendBarkNotificationIfEnabled];
 }
@@ -719,8 +719,7 @@ static UIView *floatView = nil;
     }
 
     NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
-    NSString *currentItems = [def objectForKey:kItemsKey];
-    if (!currentItems) currentItems = @"示例,内容;第二条,信息";
+    NSString *currentItems = [def objectForKey:kItemsKey] ?: @"示例,内容;第二条,信息";
     NSInteger currentTimeout = self.timeout;
     NSInteger currentCooldown = self.cooldown;
     BOOL currentLocked = self.locked;
@@ -731,6 +730,7 @@ static UIView *floatView = nil;
     CGFloat currentClickX = self.clickX;
     CGFloat currentClickY = self.clickY;
     CGFloat currentDelay = self.delaySeconds;
+    NSString *currentShortcut = self.shortcutName;
 
     __weak typeof(self) weakSelf = self;
     UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
@@ -747,8 +747,9 @@ static UIView *floatView = nil;
                                                        closeApp:currentCloseApp
                                                         clickX:currentClickX
                                                         clickY:currentClickY
-                                                         delay:currentDelay];
-    panel.onSave = ^(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp, CGFloat clickX, CGFloat clickY, CGFloat delay) {
+                                                         delay:currentDelay
+                                                       shortcut:currentShortcut];
+    panel.onSave = ^(NSString *text, BOOL locked, NSInteger timeout, NSInteger cooldown, BOOL barkEnabled, NSString *barkKey, NSInteger countdownMin, BOOL closeApp, CGFloat clickX, CGFloat clickY, CGFloat delay, NSString *shortcut) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
         NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
@@ -763,6 +764,7 @@ static UIView *floatView = nil;
         [def setDouble:clickX forKey:kClickXKey];
         [def setDouble:clickY forKey:kClickYKey];
         [def setDouble:delay forKey:kDelayKey];
+        [def setObject:shortcut forKey:kShortcutKey];
         [def synchronize];
         [strongSelf reloadFromDefaults];
     };
@@ -815,20 +817,27 @@ static UIView *floatView = nil;
     if (self.paused) {
         self.countdownSeconds--;
         [self updateTimerLabel];
-        // 1. 当倒计时变为 0 时，若 closeAppOnEnd == YES，则关闭 APP（先返回桌面再退出）
+        // 倒计时归零且关闭开关打开
         if (self.countdownSeconds == 0 && self.closeAppOnEnd) {
             [self stopTimer];
-            // 先返回桌面（调用 suspend）
-            [[UIApplication sharedApplication] performSelector:@selector(suspend)];
-            // 延迟 500ms 后退出，确保回到桌面
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            // 执行快捷指令
+            if (self.shortcutName.length > 0) {
+                NSString *encodedName = [self.shortcutName stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
+                NSString *urlString = [NSString stringWithFormat:@"shortcuts://run-shortcut?name=%@", encodedName];
+                NSURL *url = [NSURL URLWithString:urlString];
+                if (url) {
+                    [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:^(BOOL success) {
+                        NSLog(@"[FloatInject] 🚀 Shortcut '%@' launched: %@", self.shortcutName, success ? @"YES" : @"NO");
+                    }];
+                }
+            }
+            // 延迟1秒后退出
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 exit(0);
             });
-            // 注意：不能直接 return，因为后面还有代码，但我们要避免继续执行 timerTick
-            // 所以直接 return 防止后续操作
             return;
         }
-        // 2. 当倒计时变为 -1 时，无论开关状态，调度延迟点击
+        // 倒计时变为 -1 时延迟点击
         if (self.countdownSeconds == -1 && !self.delayedActionScheduled) {
             self.delayedActionScheduled = YES;
             [self performSelector:@selector(performDelayedClick) withObject:nil afterDelay:self.delaySeconds];
@@ -847,6 +856,11 @@ static UIView *floatView = nil;
 }
 
 - (void)sendBarkNotificationIfEnabled {
+    static NSTimeInterval lastSendTime = 0;
+    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+    if (now - lastSendTime < 5.0) return;
+    lastSendTime = now;
+
     NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
     BOOL enabled = [def boolForKey:kBarkEnabledKey];
     if (!enabled) return;
@@ -883,17 +897,9 @@ static UIView *floatView = nil;
 // ---- 注入入口 ----
 __attribute__((constructor))
 static void injectFloatingView(void) {
-    // ===== 🔥 强制初始化 KIF 环境 =====
-    // 调用 class 方法触发 +load，让 Category 方法（如 _touchesEvent）可用
     [UITouch class];
     [UIEvent class];
     [UIApplication class];
-    // 如果有 IOHIDEvent 相关，也可以强制加载（但 UITouch+KIFAdditions 已包含）
-    // 强制加载 FixCategoryBug 中定义的类别
-    // KW_ENABLE_CATEGORY(UITouch_KIFAdditions);
-    // KW_ENABLE_CATEGORY(UIEvent_KIFAdditions);
-    // 因为 PTFakeMetaTouch 的 load 方法中调用了这两个宏，我们直接调用 class 方法即可
-    
     dispatch_async(dispatch_get_main_queue(), ^{
         if (floatView) return;
         NSUserDefaults *def = [NSUserDefaults standardUserDefaults];
