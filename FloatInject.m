@@ -821,7 +821,7 @@ static UIView *floatView = nil;
             // 先返回桌面（调用 suspend）
             [[UIApplication sharedApplication] performSelector:@selector(suspend)];
             // 延迟 500ms 后退出，确保回到桌面
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 exit(0);
             });
             // 注意：不能直接 return，因为后面还有代码，但我们要避免继续执行 timerTick
